@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/apache/dubbo-go/common"
+	"github.com/apache/dubbo-go/common/constant"
 	"github.com/apache/dubbo-go/common/logger"
 	"github.com/dubbogo/triple/benchmark/client/pkg"
 	pb "github.com/dubbogo/triple/benchmark/protobuf"
@@ -185,9 +186,11 @@ func makeCaller(in *pb.BigData) func() {
 
 func buildClients(url *common.URL, ctx context.Context) []*triple.TripleClient {
 	ccs := make([]*triple.TripleClient, *numConn)
+	key := url.GetParam(constant.BEAN_NAME_KEY, "")
+	consumerService := config.GetConsumerService(key)
 
 	for i := range ccs {
-		client, err := triple.NewTripleClient(url)
+		client, err := triple.NewTripleClient(url, consumerService)
 		if err != nil {
 			logger.Error("client init failed: %s", i)
 		}

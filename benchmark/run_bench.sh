@@ -185,11 +185,12 @@ out_dir=$(mktemp -d oss_benchXXX)
 BENCHMARK_FOLDER=$(cd "$(dirname "$0")";pwd)
 
 export CONF_PROVIDER_FILE_PATH=${BENCHMARK_FOLDER}"/server/conf/server.yml"
+export APP_LOG_CONF_FILE=${BENCHMARK_FOLDER}"/server/conf/log.yml"
 export CONF_CONSUMER_FILE_PATH=${BENCHMARK_FOLDER}"/client/conf/client.yml"
 
 echo ${CONF_PROVIDER_FILE_PATH}
 
-go build -o ${out_dir}/server /Users/gbc/Work/go/lizhix/triple/benchmark/server/main.go && go build -o ${out_dir}/client /Users/gbc/Work/go/lizhix/triple/benchmark/client/main.go
+go build -o ${out_dir}/server ./server/main.go && go build -o ${out_dir}/client ./client/main.go
 
 if [ $? != 0 ]; then
   clean_and_die 1
