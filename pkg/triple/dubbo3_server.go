@@ -53,7 +53,9 @@ func NewTripleServer(url *common.URL, service Dubbo3GrpcService) *TripleServer {
 
 // Stop
 func (t *TripleServer) Stop() {
-	t.h2Controller.close()
+	if t.h2Controller != nil {
+		t.h2Controller.close()
+	}
 	t.closeChain <- struct{}{}
 }
 
