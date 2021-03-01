@@ -36,7 +36,7 @@ import (
 	"github.com/apache/dubbo-go/protocol"
 	"github.com/golang/protobuf/proto"
 	h2 "golang.org/x/net/http2"
-	h2Triple "golang.org/x/net/http2/triple"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 	"google.golang.org/grpc"
 )
 
