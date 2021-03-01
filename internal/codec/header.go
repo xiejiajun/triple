@@ -19,7 +19,8 @@ package codec
 
 import (
 	"context"
-	h2 "golang.org/x/net/http2"
+	h2 "github.com/dubbogo/net/http2"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 	"net/http"
 	"net/textproto"
 	"strconv"
@@ -77,7 +78,7 @@ func (t *TripleHeader) FieldToCtx() context.Context {
 	return ctx
 }
 
-func NewTripleHeaderHandler(url *dubboCommon.URL, ctx context.Context) common.ProtocolHeaderHandler {
+func NewTripleHeaderHandler(url *dubboCommon.URL, ctx context.Context) h2Triple.ProtocolHeaderHandler {
 	return &TripleHeaderHandler{
 		Url: url,
 		Ctx: ctx,
@@ -132,7 +133,7 @@ func getCtxVaSave(ctx context.Context, field string) string {
 }
 
 // ReadFromH2MetaHeader read meta header field from h2 header, and parse it to ProtocolHeader as user defined
-func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) common.ProtocolHeader {
+func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.ProtocolHeader {
 	tripleHeader := &TripleHeader{}
 	header := r.Header
 	tripleHeader.Path = r.URL.Path

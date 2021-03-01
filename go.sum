@@ -219,6 +219,8 @@ github.com/dubbogo/net v0.0.0-20210208122052-3ebc7bbc2dd8 h1:1lzbhfZqWMvunVbn2DY
 github.com/dubbogo/net v0.0.0-20210208122052-3ebc7bbc2dd8/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
 github.com/dubbogo/net v0.0.0-20210209064142-0e3827157a56 h1:SGuRExIHI3zirhNOzZYvjfE5Pix6wFR3ZWSby1o9IBE=
 github.com/dubbogo/net v0.0.0-20210209064142-0e3827157a56/go.mod h1:c+UEOYQYSvuxEb0Lnb/dNiD5jhxOYIa044Pw5gaANzY=
+github.com/dubbogo/net v0.0.2-0.20210301062110-06998ddf7cee h1:buc5s5MuiuMNuzKekYB7S1ofPZ0kwOIolDUWK6RSnxA=
+github.com/dubbogo/net v0.0.2-0.20210301062110-06998ddf7cee/go.mod h1:/HnN8q8+J78c7FLM4IUQvuzdnz04sMgU9goaPWNM04A=
 github.com/dubbogo/triple v0.0.0-20210109081225-7eb79b3a65e1/go.mod h1:GpLPajP2b/G8zNtG8R30BhJEuwzh29X48oqi7OLgALk=
 github.com/dubbogo/triple v0.0.0-20210209063802-ba75c3ed4425/go.mod h1:H0+IdFdLkIm5m8rCn8ANoJQuIp+K1U/7ifm8f4EUPvA=
 github.com/dubbogo/triple v0.0.0-20210209070209-fbd5ecacd554/go.mod h1:F/zbWMfPo/JB1wX03Pg61uY2KcguFBnYizSAbhYY/d8=
@@ -967,6 +969,7 @@ golang.org/x/net v0.0.0-20200625001655-4c5254603344/go.mod h1:/O7V0waA8r7cgGh81R
 golang.org/x/net v0.0.0-20200822124328-c89045814202/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
 golang.org/x/net v0.0.0-20201224014010-6772e930b67b h1:iFwSg7t5GZmB/Q5TjiEAsdoLDrdJRC1RiF2WhuV29Qw=
 golang.org/x/net v0.0.0-20201224014010-6772e930b67b/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
+golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 h1:qWPm9rbaAMKs8Bq/9LRpbMqxWRVUAQwMI9fVrssnTfw=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=

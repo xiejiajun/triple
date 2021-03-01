@@ -19,6 +19,7 @@ package triple
 
 import (
 	"bytes"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 )
 import (
 	dubboCommon "github.com/apache/dubbo-go/common"
@@ -109,7 +110,7 @@ type baseStream struct {
 	recvBuf *MsgBuffer
 	sendBuf *MsgBuffer
 	url     *dubboCommon.URL
-	header  common.ProtocolHeader
+	header  h2Triple.ProtocolHeader
 	service Dubbo3GrpcService
 	// splitBuffer is used to cache splited data from network, if exceed
 	splitBuffer BufferMsg
@@ -246,7 +247,7 @@ func newBaseStream(streamID uint32, service Dubbo3GrpcService) *baseStream {
 type serverStream struct {
 	baseStream
 	processor processor
-	header    common.ProtocolHeader
+	header    h2Triple.ProtocolHeader
 }
 
 // todo close logic
@@ -257,7 +258,7 @@ func (ss *serverStream) close() {
 	//	close(ss.recvBuf.c)
 }
 
-func newServerStream(header common.ProtocolHeader, desc interface{}, url *dubboCommon.URL, service Dubbo3GrpcService) (*serverStream, error) {
+func newServerStream(header h2Triple.ProtocolHeader, desc interface{}, url *dubboCommon.URL, service Dubbo3GrpcService) (*serverStream, error) {
 	baseStream := newBaseStream(header.GetStreamID(), service)
 
 	serverStream := &serverStream{
@@ -289,7 +290,7 @@ func (s *serverStream) getService() Dubbo3GrpcService {
 	return s.service
 }
 
-func (s *serverStream) getHeader() common.ProtocolHeader {
+func (s *serverStream) getHeader() h2Triple.ProtocolHeader {
 	return s.header
 }
 

@@ -2,10 +2,10 @@ package common
 
 import (
 	"context"
-	dubboCommon "github.com/apache/dubbo-go/common"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
+	"github.com/apache/dubbo-go/common"
+	netTriple "github.com/dubbogo/net/http2/triple"
 	"gotest.tools/assert"
+	"net/http"
 	"reflect"
 	"testing"
 )
@@ -15,7 +15,7 @@ type ImplProtocolHeader struct {
 	StreamID uint32
 }
 
-func (t *ImplProtocolHeader) GetMethod() string {
+func (t *ImplProtocolHeader) GetPath() string {
 	return t.Method
 }
 func (t *ImplProtocolHeader) GetStreamID() uint32 {
@@ -30,22 +30,26 @@ func (t *ImplProtocolHeader) FieldToCtx() context.Context {
 type ImplProtocolHeaderHandler struct {
 }
 
-func (ihh *ImplProtocolHeaderHandler) ReadFromH2MetaHeader(frame *http2.MetaHeadersFrame) ProtocolHeader {
+func (ihh *ImplProtocolHeaderHandler) ReadFromTripleReqHeader(header *http.Request) netTriple.ProtocolHeader {
 	return &ImplProtocolHeader{}
 }
 
-func (hh ImplProtocolHeaderHandler) WriteHeaderField(url *dubboCommon.URL, ctx context.Context, headerFields []hpack.HeaderField) []hpack.HeaderField {
+func (hh *ImplProtocolHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
 	return nil
 }
 
-func NewTestHeaderHandler() ProtocolHeaderHandler {
+func (hh *ImplProtocolHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter) {
+
+}
+
+func NewTestHeaderHandler(url *common.URL, ctx context.Context) netTriple.ProtocolHeaderHandler {
 	return &ImplProtocolHeaderHandler{}
 }
 
 func TestSetAndGetProtocolHeaderHandler(t *testing.T) {
-	oriHandler := NewTestHeaderHandler()
+	oriHandler := NewTestHeaderHandler(nil, context.Background())
 	SetProtocolHeaderHandler("test-protocol", NewTestHeaderHandler)
-	handler, err := GetProtocolHeaderHandler("test-protocol")
+	handler, err := GetProtocolHeaderHandler("test-protocol", nil, context.Background())
 	assert.Equal(t, err, nil)
 	assert.Equal(t, reflect.TypeOf(handler), reflect.TypeOf(oriHandler))
 }

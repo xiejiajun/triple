@@ -27,8 +27,8 @@ import (
 )
 
 import (
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
+	"github.com/dubbogo/net/http2"
+	"github.com/dubbogo/net/http2/hpack"
 )
 import (
 	"github.com/dubbogo/triple/internal/codes"

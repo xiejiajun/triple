@@ -21,32 +21,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/apache/dubbo-go/common"
-	"net/http"
+	netTriple "github.com/dubbogo/net/http2/triple"
 )
 import (
 	"github.com/apache/dubbo-go/common/logger"
 	perrors "github.com/pkg/errors"
 )
 
-// ProtocolHeader
-type ProtocolHeader interface {
-	GetStreamID() uint32
-	GetPath() string
-	FieldToCtx() context.Context
-}
-
-type ProtocolHeaderHandler interface {
-	ReadFromTripleReqHeader(header *http.Request) ProtocolHeader
-	WriteTripleReqHeaderField(header http.Header) http.Header
-	WriteTripleFinalRspHeaderField(w http.ResponseWriter)
-	//Context2Url(ctx context.Context, url *common.URL)
-}
-
-type ProtocolHeaderHandlerFactory func(url *common.URL, ctx context.Context) ProtocolHeaderHandler
+type ProtocolHeaderHandlerFactory func(url *common.URL, ctx context.Context) netTriple.ProtocolHeaderHandler
 
 var protocolHeaderHandlerFactoryMap = make(map[string]ProtocolHeaderHandlerFactory)
 
-func GetProtocolHeaderHandler(protocol string, url *common.URL, ctx context.Context) (ProtocolHeaderHandler, error) {
+func GetProtocolHeaderHandler(protocol string, url *common.URL, ctx context.Context) (netTriple.ProtocolHeaderHandler, error) {
 	if f, ok := protocolHeaderHandlerFactoryMap[protocol]; ok {
 		return f(url, ctx), nil
 	}

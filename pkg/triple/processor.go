@@ -20,6 +20,7 @@ package triple
 import (
 	"bytes"
 	"errors"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 )
 import (
 	"github.com/apache/dubbo-go/common/logger"
@@ -87,7 +88,7 @@ func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc g
 }
 
 // processUnaryRPC can process unary rpc
-func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service Dubbo3GrpcService, header common.ProtocolHeader) ([]byte, error) {
+func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service Dubbo3GrpcService, header h2Triple.ProtocolHeader) ([]byte, error) {
 	readBuf := buf.Bytes()
 
 	pkgData, _ := p.pkgHandler.Frame2PkgData(readBuf)

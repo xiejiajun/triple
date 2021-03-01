@@ -34,9 +34,9 @@ import (
 	dubboCommon "github.com/apache/dubbo-go/common"
 	"github.com/apache/dubbo-go/common/logger"
 	"github.com/apache/dubbo-go/protocol"
+	h2 "github.com/dubbogo/net/http2"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 	"github.com/golang/protobuf/proto"
-	h2 "golang.org/x/net/http2"
-	h2Triple "golang.org/x/net/http2/triple"
 	"google.golang.org/grpc"
 )
 
@@ -248,7 +248,7 @@ func NewH2Controller(conn net.Conn, isServer bool, service Dubbo3GrpcService, ur
 
 // addServerStream can create a serverStream and add to h2Controller by @data read from frame,
 // after receiving a request from client.
-func (h *H2Controller) addServerStream(data common.ProtocolHeader) stream {
+func (h *H2Controller) addServerStream(data h2Triple.ProtocolHeader) stream {
 	methodName := strings.Split(data.GetPath(), "/")[2]
 	md, okm := h.mdMap[methodName]
 	streamd, oks := h.strMap[methodName]
