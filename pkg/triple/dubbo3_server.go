@@ -54,7 +54,7 @@ func NewTripleServer(url *common.URL, service Dubbo3GrpcService) *TripleServer {
 // Stop
 func (t *TripleServer) Stop() {
 	if t.h2Controller != nil {
-		t.h2Controller.close()
+		t.h2Controller.Destroy()
 	}
 	t.closeChain <- struct{}{}
 }
@@ -99,7 +99,7 @@ func (t *TripleServer) run() {
 // handleRawConn create a H2 Controller to deal with new conn
 func (t *TripleServer) handleRawConn(conn net.Conn) error {
 	srv := &http2.Server{}
-	h2Controller, err := NewH2Controller(conn, true, t.rpcService, t.url)
+	h2Controller, err := NewH2Controller(true, t.rpcService, t.url)
 	if err != nil {
 		return err
 	}

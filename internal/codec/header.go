@@ -39,6 +39,12 @@ func init() {
 	common.SetProtocolHeaderHandler(DUBBO3, NewTripleHeaderHandler)
 }
 
+const (
+	TrailerKeyGrpcStatus    = "grpc-status"
+	TrailerKeyGrpcMessage   = "grpc-message"
+	TrailerKeyTraceProtoBin = "trace-proto-bin"
+)
+
 // TripleHeader define the h2 header of triple impl
 type TripleHeader struct {
 	Path           string
@@ -117,11 +123,10 @@ func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http
 	return header
 }
 
-func (t *TripleHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter) {
-	w.Header().Add("content-type", "application/grpc+proto")
-	w.Header().Add(h2.TrailerPrefix+"grpc-status", strconv.Itoa(int(0)))     // sendMsg.st.Code()
-	w.Header().Add(h2.TrailerPrefix+"grpc-message", "")                      //encodeGrpcMessage(""))
-	w.Header().Add(h2.TrailerPrefix+"trace-proto-bin", strconv.Itoa(int(0))) // sendMsg.st.Code()
+func (t *TripleHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
+	w.Header().Add(h2.TrailerPrefix+TrailerKeyGrpcStatus, strconv.Itoa(grpcStatusCode))   // sendMsg.st.Code()
+	w.Header().Add(h2.TrailerPrefix+TrailerKeyGrpcMessage, grpcMessage)                   //encodeGrpcMessage(""))
+	w.Header().Add(h2.TrailerPrefix+TrailerKeyTraceProtoBin, strconv.Itoa(traceProtoBin)) // sendMsg.st.Code()
 }
 
 func getCtxVaSave(ctx context.Context, field string) string {

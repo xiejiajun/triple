@@ -19,7 +19,6 @@ package triple
 
 import (
 	"context"
-	"github.com/dubbogo/triple/pkg/common"
 	"net"
 	"reflect"
 	"sync"
@@ -97,15 +96,11 @@ func NewTripleClient(url *dubboCommon.URL, impl interface{}) (*TripleClient, err
 // Connect called when new TripleClient, which start a tcp conn with target addr
 func (t *TripleClient) connect(url *dubboCommon.URL) error {
 	logger.Info("want to connect to url = ", url.Location)
-	//conn, err := net.Dial("tcp", url.Location)
-	//if err != nil {
-	//	return err
-	//}
 	t.addr = url.Location
-	//t.conn = conn
 	var err error
-	t.h2Controller, err = NewH2Controller(nil, false, nil, url)
+	t.h2Controller, err = NewH2Controller(false, nil, url)
 	if err != nil {
+		logger.Errorf("dubbo client new http2 controller error = %v", err)
 		return err
 	}
 	t.h2Controller.address = url.Location
@@ -116,14 +111,16 @@ func (t *TripleClient) connect(url *dubboCommon.URL) error {
 func (t *TripleClient) Request(ctx context.Context, method string, arg, reply interface{}) error {
 	reqData, err := proto.Marshal(arg.(proto.Message))
 	if err != nil {
-		panic("client request marshal not ok ")
+		logger.Errorf("client request marshal error = %v", err)
+		return err
 	}
-	if t.h2Controller.state != common.Reachable { // receive goaway fm that make it unreachable
+	if t.h2Controller == nil {
 		if err := t.connect(t.url); err != nil {
+			logger.Errorf("dubbo client connect to url error = %v", err)
 			return err
 		}
 	}
-	if err := t.h2Controller.UnaryInvoke(ctx, method, "", reqData, reply, t.url); err != nil {
+	if err := t.h2Controller.UnaryInvoke(ctx, method, reqData, reply); err != nil {
 		return err
 	}
 	return nil
@@ -131,8 +128,9 @@ func (t *TripleClient) Request(ctx context.Context, method string, arg, reply in
 
 // StreamRequest call h2Controller to send streaming request to sever, to start link.
 func (t *TripleClient) StreamRequest(ctx context.Context, method string) (grpc.ClientStream, error) {
-	if t.h2Controller.state != common.Reachable { // receive goaway fm that make it unreachable
+	if t.h2Controller == nil {
 		if err := t.connect(t.url); err != nil {
+			logger.Errorf("dubbo client connect to url error = %v", err)
 			return nil, err
 		}
 	}
@@ -142,7 +140,7 @@ func (t *TripleClient) StreamRequest(ctx context.Context, method string) (grpc.C
 // Close
 func (t *TripleClient) Close() {
 	logger.Debug("Triple Client Is closing")
-	t.h2Controller.close()
+	t.h2Controller.Destroy()
 }
 
 // IsAvailable

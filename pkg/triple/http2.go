@@ -22,11 +22,14 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
+	"github.com/dubbogo/triple/internal/codes"
+	perrors "github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"io"
 	"math"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -47,24 +50,15 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 )
 
-// H2Controller is an important object of h2 protocol
-// it can be used as serverEnd and clientEnd, identified by isServer field
-// it can shake hand by client or server end, to start triple transfer
-// higher layer can call H2Controller's StreamInvoke or UnaryInvoke method to deal with event
-// it maintains streamMap, with can contain have many higher layer object: stream, used by event driven.
-// it maintains the data stream from lower layer's net/h2frame to higher layer's stream/userStream
-type H2Controller struct {
-	// conn is used to init h2 framer
-	conn net.Conn
+const defaultReadBuffer = 1000000
 
+// H2Controller is ...
+type H2Controller struct {
 	// client stores http2 client
 	client http.Client
 
 	// address stores target ip:port
 	address string
-
-	//// streamMap store all non-closed stream, key by streamID (uint32)
-	//streamMap sync.Map
 
 	// mdMap strMap is used to store discover of user impl function
 	mdMap  map[string]grpc.MethodDesc
@@ -74,16 +68,16 @@ type H2Controller struct {
 	// url is also used to init triple header
 	url *dubboCommon.URL
 
+	// pkgHandler is to convert between raw data and frame data
 	pkgHandler common.PackageHandler
-	service    Dubbo3GrpcService
 
-	// state shows conn state, after receiving go away frame, state will be set to draining
-	// so as not to receive request from dubbo3 client, and client will new an other conn to replace
-	state common.H2ControllerState
+	// service is user impl service
+	service Dubbo3GrpcService
+
+	closeChan chan struct{}
 }
 
-const defaultReadBuffer = 1000000
-
+// skipHeader
 func skipHeader(frameData []byte) ([]byte, uint32) {
 	if len(frameData) < 5 {
 		return []byte{}, 0
@@ -146,8 +140,13 @@ func (hc *H2Controller) readSplitedDatas(rBody io.ReadCloser) chan BufferMsg {
 }
 
 func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
 
+	return func(w http.ResponseWriter, r *http.Request) {
+		var (
+			grpcMessage   = ""
+			grpcCode      = 0
+			traceProtoBin = 0
+		)
 		headerHandler, _ := common.GetProtocolHeaderHandler(hc.url.Protocol, nil, nil)
 		header := headerHandler.ReadFromTripleReqHeader(r)
 		stream := hc.addServerStream(header)
@@ -155,29 +154,51 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 			logger.Error("creat server stream error!")
 		}
 		sendChan := stream.getSend()
+		closeChan := make(chan struct{})
 		ch := hc.readSplitedDatas(r.Body)
 		go func() {
 			for {
-				msgData := <-ch
-				if msgData.msgType == ServerStreamCloseMsgType {
-					//fmt.Println("read from client stop!")
+				select {
+				case <-closeChan:
+					stream.close()
 					return
+				case msgData := <-ch:
+					if msgData.msgType == ServerStreamCloseMsgType {
+						return
+					}
+					data := hc.pkgHandler.Pkg2FrameData(msgData.buffer.Bytes())
+					stream.putRecv(data, DataMsgType)
 				}
-				data := hc.pkgHandler.Pkg2FrameData(msgData.buffer.Bytes())
-				stream.putRecv(data, DataMsgType)
+
 			}
 		}()
-
-		headerHandler.WriteTripleFinalRspHeaderField(w)
-
+		// first response header
+		w.Header().Add("content-type", "application/grpc+proto")
+	LOOP:
 		for {
-			sendMsg := <-sendChan
-			if sendMsg.buffer == nil || sendMsg.msgType != DataMsgType {
-				return
+			select {
+			case <-hc.closeChan:
+				grpcCode = int(codes.Canceled)
+				grpcMessage = "triple server canceled by force" // encodeGrpcMessage(sendMsg.st.Message())
+				break LOOP
+			case sendMsg := <-sendChan:
+				if sendMsg.buffer == nil || sendMsg.msgType != DataMsgType {
+					// write sendMsg.st.Message() to w header
+					if sendMsg.st != nil {
+						grpcCode = int(sendMsg.st.Code())
+						grpcMessage = "message error" // encodeGrpcMessage(sendMsg.st.Message())
+					}
+					break LOOP
+				}
+				sendData := sendMsg.buffer.Bytes()
+				w.Write(sendData)
 			}
-			sendData := sendMsg.buffer.Bytes()
-			w.Write(sendData)
 		}
+
+		// second response header
+		headerHandler.WriteTripleFinalRspHeaderField(w, grpcCode, grpcMessage, traceProtoBin)
+		// close all related go routines
+		close(closeChan)
 	}
 }
 
@@ -204,7 +225,7 @@ func getMethodAndStreamDescMap(ds Dubbo3GrpcService) (map[string]grpc.MethodDesc
 }
 
 // NewH2Controller can create H2Controller with conn
-func NewH2Controller(conn net.Conn, isServer bool, service Dubbo3GrpcService, url *dubboCommon.URL) (*H2Controller, error) {
+func NewH2Controller(isServer bool, service Dubbo3GrpcService, url *dubboCommon.URL) (*H2Controller, error) {
 	var mdMap map[string]grpc.MethodDesc
 	var strMap map[string]grpc.StreamDesc
 	var err error
@@ -233,15 +254,13 @@ func NewH2Controller(conn net.Conn, isServer bool, service Dubbo3GrpcService, ur
 		},
 	}
 	h2c := &H2Controller{
-		conn:   conn,
-		url:    url,
-		client: client,
-		//streamMap:  sync.Map{},
+		url:        url,
+		client:     client,
 		mdMap:      mdMap,
 		strMap:     strMap,
 		service:    service,
 		pkgHandler: pkgHandler,
-		state:      common.Reachable,
+		closeChan:  make(chan struct{}),
 	}
 	return h2c, nil
 }
@@ -264,22 +283,19 @@ func (h *H2Controller) addServerStream(data h2Triple.ProtocolHeader) stream {
 			logger.Error("newServerStream error", err)
 			return nil
 		}
-		// now, unary stream is only invoked by http2 api
-		//go h.runSendUnaryRsp(newstm)
 	} else {
 		newstm, err = newServerStream(data, streamd, h.url, h.service)
 		if err != nil {
 			logger.Error("newServerStream error", err)
 			return nil
 		}
-		// go h.runSendStreamRsp(newstm)
 	}
 	return newstm
 }
 
 // StreamInvoke can start streaming invocation, called by triple client
 func (h *H2Controller) StreamInvoke(ctx context.Context, method string) (grpc.ClientStream, error) {
-	clientStream := newClientStream(0)
+	clientStream := newClientStream()
 	serilizer, err := common.GetDubbo3Serializer(codec.DefaultDubbo3SerializerName)
 	if err != nil {
 		logger.Error("get serilizer error = ", err)
@@ -288,16 +304,18 @@ func (h *H2Controller) StreamInvoke(ctx context.Context, method string) (grpc.Cl
 
 	tosend := clientStream.getSend()
 	sendStreamChan := make(chan h2Triple.BufferMsg)
+	closeChan := make(chan struct{})
 	go func() {
 		for {
 			select {
+			case <-closeChan:
+				clientStream.close()
+				return
 			case sendMsg := <-tosend:
 				sendStreamChan <- h2Triple.BufferMsg{
 					Buffer:  bytes.NewBuffer(sendMsg.buffer.Bytes()),
 					MsgType: h2Triple.MsgType(sendMsg.msgType),
 				}
-			default:
-
 			}
 		}
 	}()
@@ -312,26 +330,37 @@ func (h *H2Controller) StreamInvoke(ctx context.Context, method string) (grpc.Cl
 			panic(err)
 		}
 		ch := h.readSplitedDatas(rsp.Body)
+	LOOP:
 		for {
-			data := <-ch
-			if data.buffer == nil {
-				return
+			select {
+			case <-h.closeChan:
+				close(closeChan)
+			case data := <-ch:
+				if data.buffer == nil || data.msgType == ServerStreamCloseMsgType {
+					// stream receive done, close send go routine
+					close(closeChan)
+					break LOOP
+				}
+				pkg := h.pkgHandler.Pkg2FrameData(data.buffer.Bytes())
+				clientStream.putRecv(pkg, DataMsgType)
 			}
-			pkg := h.pkgHandler.Pkg2FrameData(data.buffer.Bytes())
-			clientStream.putRecv(pkg, DataMsgType)
+
 		}
+		trailer := rsp.Body.(*h2Triple.ResponseBody).GetTrailer()
+		code, _ := strconv.Atoi(trailer.Get(codec.TrailerKeyGrpcStatus))
+		msg := trailer.Get(codec.TrailerKeyGrpcMessage)
+		if codes.Code(code) != codes.OK {
+			logger.Errorf("grpc status not success,msg = %s, code = %d", msg, code)
+		}
+
 	}()
 
-	//buf.Write(h.pkgHandler.Pkg2FrameData(data))
-
-	// 4. start receive data to send
 	pkgHandler, err := common.GetPackagerHandler(h.url.Protocol)
 	return newClientUserStream(clientStream, serilizer, pkgHandler), nil
 }
 
 // UnaryInvoke can start unary invocation, called by dubbo3 client
-func (h *H2Controller) UnaryInvoke(ctx context.Context, method string, addr12 string, data []byte, reply interface{}, url *dubboCommon.URL) error {
-
+func (h *H2Controller) UnaryInvoke(ctx context.Context, method string, data []byte, reply interface{}) error {
 	sendStreamChan := make(chan h2Triple.BufferMsg, 1)
 	sendStreamChan <- h2Triple.BufferMsg{
 		Buffer:  bytes.NewBuffer(h.pkgHandler.Pkg2FrameData(data)),
@@ -346,22 +375,22 @@ func (h *H2Controller) UnaryInvoke(ctx context.Context, method string, addr12 st
 
 	rsp, err := h.client.Post("https://"+h.address+method, "application/grpc+proto", &stremaReq)
 	if err != nil {
-		panic(err)
+		logger.Errorf("triple unary invoke error = %v", err)
+		return err
 	}
 	readBuf := make([]byte, defaultReadBuffer)
 
-	if err != nil {
-		panic(err)
-	}
-
+	// splitBuffer is to temporarily store collected split data, and add them together
 	splitBuffer := BufferMsg{
 		buffer: bytes.NewBuffer(make([]byte, 0)),
 	}
+
 	fromFrameHeaderDataSize := uint32(0)
 	for {
 		n, err := rsp.Body.Read(readBuf)
 		if err != nil {
-			panic(err)
+			logger.Errorf("dubbo3 unary invoke read error = %v\n", err)
+			return err
 		}
 		splitedData := readBuf[:n]
 		if fromFrameHeaderDataSize == 0 {
@@ -376,8 +405,8 @@ func (h *H2Controller) UnaryInvoke(ctx context.Context, method string, addr12 st
 		}
 		splitBuffer.buffer.Write(splitedData)
 		if splitBuffer.buffer.Len() > int(fromFrameHeaderDataSize) {
-			panic("Receive Splited Data is bigger than wanted!!!")
-			return nil
+			logger.Error("dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
+			return perrors.New("dubbo3 unary invoke error = Receive Splited Data is bigger than wanted.")
 		}
 
 		if splitBuffer.buffer.Len() == int(fromFrameHeaderDataSize) {
@@ -385,17 +414,28 @@ func (h *H2Controller) UnaryInvoke(ctx context.Context, method string, addr12 st
 		}
 	}
 
+	// todo start ticker to avoid trailer timeout
+	trailer := rsp.Body.(*h2Triple.ResponseBody).GetTrailer()
+	code, err := strconv.Atoi(trailer.Get(codec.TrailerKeyGrpcStatus))
+	if err != nil {
+		logger.Errorf("get trailer err = %v", err)
+		return perrors.Errorf("get trailer err = %v", err)
+	}
+	msg := trailer.Get(codec.TrailerKeyGrpcMessage)
+
+	if codes.Code(code) != codes.OK {
+		logger.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
+		return perrors.Errorf("grpc status not success, msg = %s, code = %d", msg, code)
+	}
+
+	// all split data are collected and to unmarshal
 	if err := proto.Unmarshal(splitBuffer.buffer.Bytes(), reply.(proto.Message)); err != nil {
-		logger.Error("client unmarshal rsp err:", err)
+		logger.Errorf("client unmarshal rsp err= %v\n", err)
 		return err
 	}
 	return nil
 }
 
-func (h2 *H2Controller) close() {
-	//h2.streamMap.Range(func(k, v interface{}) bool {
-	//	v.(stream).close()
-	//	return true
-	//})
-	h2.state = common.Closing
+func (h2 *H2Controller) Destroy() {
+	close(h2.closeChan)
 }
