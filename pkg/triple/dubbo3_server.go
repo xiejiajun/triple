@@ -18,8 +18,6 @@
 package triple
 
 import (
-	common2 "github.com/dubbogo/triple/pkg/common"
-	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -27,23 +25,28 @@ import (
 )
 
 import (
-	"github.com/apache/dubbo-go/common"
+	dubboCommon "github.com/apache/dubbo-go/common"
 	"github.com/apache/dubbo-go/common/logger"
+	"golang.org/x/net/http2"
+)
+
+import (
+	common "github.com/dubbogo/triple/pkg/common"
 )
 
 // TripleServer is the object that can be started and listening remote request
 type TripleServer struct {
 	lst          net.Listener
 	addr         string
-	rpcService   common2.Dubbo3GrpcService
-	url          *common.URL
+	rpcService   common.Dubbo3GrpcService
+	url          *dubboCommon.URL
 	h2Controller *H2Controller
 	once         sync.Once // use when destroy
 	closeChain   chan struct{}
 }
 
 // NewTripleServer can create Server with user impled @service and url
-func NewTripleServer(url *common.URL, service common2.Dubbo3GrpcService) *TripleServer {
+func NewTripleServer(url *dubboCommon.URL, service common.Dubbo3GrpcService) *TripleServer {
 	return &TripleServer{
 		addr:       url.Location,
 		rpcService: service,

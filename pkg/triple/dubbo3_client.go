@@ -27,7 +27,6 @@ import (
 import (
 	dubboCommon "github.com/apache/dubbo-go/common"
 	"github.com/apache/dubbo-go/common/logger"
-
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -40,43 +39,6 @@ type TripleClient struct {
 	Invoker      reflect.Value
 	url          *dubboCommon.URL
 	once         sync.Once //use when destroy
-}
-
-// TripleConn is the sturuct that called in pb.go file, it's client field contains all net logic of dubbo3
-type TripleConn struct {
-	client *TripleClient
-}
-
-// Invoke called when unary rpc 's pb.go file
-func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) error {
-	if err := t.client.Request(ctx, method, args, reply); err != nil {
-		return err
-	}
-	return nil
-}
-
-// NewStream called when streaming rpc 's pb.go file
-func (t *TripleConn) NewStream(ctx context.Context, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	return t.client.StreamRequest(ctx, method)
-}
-
-// newTripleConn new a triple conn with given @tripleclient, which contains all net logic
-func newTripleConn(client *TripleClient) *TripleConn {
-	return &TripleConn{
-		client: client,
-	}
-}
-
-// getInvoker return invoker that have service method
-func getInvoker(impl interface{}, conn *TripleConn) interface{} {
-	in := make([]reflect.Value, 0, 16)
-	in = append(in, reflect.ValueOf(conn))
-
-	method := reflect.ValueOf(impl).MethodByName("GetDubboStub")
-	res := method.Call(in)
-	// res[0] is a struct that contains SayHello method, res[0] is greeter Client in example
-	// it's SayHello methodwill call specific of conn's invoker.
-	return res[0].Interface()
 }
 
 // NewTripleClient create triple client with given @url,
@@ -143,7 +105,7 @@ func (t *TripleClient) Close() {
 	t.h2Controller.Destroy()
 }
 
-// IsAvailable
+// todo IsAvailable
 func (t *TripleClient) IsAvailable() bool {
 	return true
 }
