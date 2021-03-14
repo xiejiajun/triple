@@ -34,17 +34,14 @@ func init() {
 	common.SetPackageHandler(DUBBO3, NewTriplePkgHandler)
 }
 
-// TriplePackageHandler handles package of triple
+// TriplePackageHandler is the imple of PackageHandler, and it handles data package of triple
 // e.g. now it impl as deal with pkg data as: [:5]is length and [5:lenght] is body
 type TriplePackageHandler struct {
 	header *TripleHeader
-	//codec  *CodeC
 }
 
-// Frame2PkgData/Pkg2FrameData is not as useless as you think!
-// it add the len of frameData to the front of Triple/grpc pkg
-// when receiving streaming rpc package, as there is no EndStream flag between each stream pkg
-// the len of frameData in the front of pkg is the only way to split each pkg in transporting
+// Frame2PkgData/Pkg2FrameData is not as useless!
+// We use it to get raw data from http2 golang package,
 func (t *TriplePackageHandler) Frame2PkgData(frameData []byte) ([]byte, uint32) {
 	if len(frameData) < 5 {
 		return []byte{}, 0
@@ -58,6 +55,8 @@ func (t *TriplePackageHandler) Frame2PkgData(frameData []byte) ([]byte, uint32) 
 	}
 	return frameData[5 : 5+length], length
 }
+
+// Pkg2FrameData returns data with length header
 func (t *TriplePackageHandler) Pkg2FrameData(pkgData []byte) []byte {
 	rsp := make([]byte, 5+len(pkgData))
 	rsp[0] = byte(0)
@@ -66,6 +65,7 @@ func (t *TriplePackageHandler) Pkg2FrameData(pkgData []byte) []byte {
 	return rsp
 }
 
+// NewTriplePkgHandler
 func NewTriplePkgHandler() common.PackageHandler {
 	return &TriplePackageHandler{}
 }

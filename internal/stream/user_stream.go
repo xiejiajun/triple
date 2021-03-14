@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package triple
+package stream
 
 import (
 	"context"
 	"github.com/apache/dubbo-go/common/logger"
+	"github.com/dubbogo/triple/internal/buffer"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/metadata"
 )
@@ -30,7 +31,7 @@ import (
 
 // baseUserStream is the base userstream impl
 type baseUserStream struct {
-	stream     stream
+	stream     Stream
 	serilizer  common.Dubbo3Serializer
 	pkgHandler common.PackageHandler
 }
@@ -54,17 +55,17 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 		return err
 	}
 	rspFrameData := ss.pkgHandler.Pkg2FrameData(replyData)
-	ss.stream.putSend(rspFrameData, DataMsgType)
+	ss.stream.PutSend(rspFrameData, buffer.DataMsgType)
 	return nil
 }
 
 func (ss *baseUserStream) RecvMsg(m interface{}) error {
-	recvChan := ss.stream.getRecv()
+	recvChan := ss.stream.GetRecv()
 	readBuf := <-recvChan
-	if readBuf.buffer == nil {
+	if readBuf.Buffer == nil {
 		return errors.Errorf("user stream closed!")
 	}
-	pkgData, _ := ss.pkgHandler.Frame2PkgData(readBuf.buffer.Bytes())
+	pkgData, _ := ss.pkgHandler.Frame2PkgData(readBuf.Bytes())
 	if err := ss.serilizer.Unmarshal(pkgData, m); err != nil {
 		return err
 	}
@@ -76,7 +77,7 @@ type serverUserStream struct {
 	baseUserStream
 }
 
-func newServerUserStream(s stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler) *serverUserStream {
+func newServerUserStream(s Stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler) *serverUserStream {
 	return &serverUserStream{
 		baseUserStream: baseUserStream{
 			serilizer:  serilizer,
@@ -102,7 +103,7 @@ func (ss *clientUserStream) CloseSend() error {
 	return nil
 }
 
-func newClientUserStream(s stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler) *clientUserStream {
+func NewClientUserStream(s Stream, serilizer common.Dubbo3Serializer, pkgHandler common.PackageHandler) *clientUserStream {
 	return &clientUserStream{
 		baseUserStream: baseUserStream{
 			serilizer:  serilizer,

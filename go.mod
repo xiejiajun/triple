@@ -2,7 +2,10 @@ module github.com/dubbogo/triple
 
 go 1.15
 
-//replace github.com/apache/dubbo-go v1.5.5 => ../dubbo-go
+replace github.com/apache/dubbo-go v1.5.5 => ../dubbo-go
+replace (
+	github.com/dubbogo/net v0.0.2-0.20210312095142-e0595532fde0 => ../net
+)
 
 require (
 	github.com/apache/dubbo-go v1.5.5

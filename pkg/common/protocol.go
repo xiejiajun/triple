@@ -44,7 +44,7 @@ func SetProtocolHeaderHandler(protocol string, factory ProtocolHeaderHandlerFact
 	protocolHeaderHandlerFactoryMap[protocol] = factory
 }
 
-// PackageHandler
+// PackageHandler is to handle http framedata and raw data
 type PackageHandler interface {
 	Frame2PkgData(frameData []byte) ([]byte, uint32)
 	Pkg2FrameData(pkgData []byte) []byte

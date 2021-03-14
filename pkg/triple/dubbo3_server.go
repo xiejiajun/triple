@@ -18,6 +18,7 @@
 package triple
 
 import (
+	common2 "github.com/dubbogo/triple/pkg/common"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -34,7 +35,7 @@ import (
 type TripleServer struct {
 	lst          net.Listener
 	addr         string
-	rpcService   Dubbo3GrpcService
+	rpcService   common2.Dubbo3GrpcService
 	url          *common.URL
 	h2Controller *H2Controller
 	once         sync.Once // use when destroy
@@ -42,7 +43,7 @@ type TripleServer struct {
 }
 
 // NewTripleServer can create Server with user impled @service and url
-func NewTripleServer(url *common.URL, service Dubbo3GrpcService) *TripleServer {
+func NewTripleServer(url *common.URL, service common2.Dubbo3GrpcService) *TripleServer {
 	return &TripleServer{
 		addr:       url.Location,
 		rpcService: service,

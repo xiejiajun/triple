@@ -38,7 +38,7 @@ func (hh *ImplProtocolHeaderHandler) WriteTripleReqHeaderField(header http.Heade
 	return nil
 }
 
-func (hh *ImplProtocolHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter) {
+func (hh *ImplProtocolHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
 
 }
 

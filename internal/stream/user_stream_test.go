@@ -1,4 +1,4 @@
-package triple
+package stream
 
 import (
 	"github.com/apache/dubbo-go/protocol"

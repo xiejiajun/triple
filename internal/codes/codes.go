@@ -92,7 +92,7 @@ var strToCode = map[string]Code{
 	`"UNAUTHENTICATED"`:    Unauthenticated,
 }
 
-// UnmarshalJSON unmarshals b into the Code.
+// UnmarshalJSON unmarshal @b into the Code.
 func (c *Code) UnmarshalJSON(b []byte) error {
 	// From json.Unmarshaler: By convention, to approximate the behavior of
 	// Unmarshal itself, Unmarshalers implement UnmarshalJSON([]byte("null")) as

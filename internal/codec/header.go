@@ -39,13 +39,20 @@ func init() {
 	common.SetProtocolHeaderHandler(DUBBO3, NewTripleHeaderHandler)
 }
 
+// TrailerKeys are to make triple compatible with grpc
+// After server returning the rsp header and body, it returns Trailer header in the end, to send grpc status of this invocation.
 const (
-	TrailerKeyGrpcStatus    = "grpc-status"
-	TrailerKeyGrpcMessage   = "grpc-message"
+	// TrailerKeyGrpcStatus is a trailer header field to response grpc code (int).
+	TrailerKeyGrpcStatus = "grpc-status"
+
+	// TrailerKeyGrpcMessage is a trailer header field to response grpc error message.
+	TrailerKeyGrpcMessage = "grpc-message"
+
+	// TrailerKeyTraceProtoBin is triple trailer header
 	TrailerKeyTraceProtoBin = "trace-proto-bin"
 )
 
-// TripleHeader define the h2 header of triple impl
+// TripleHeader stores the needed http2 header fields of triple protocol
 type TripleHeader struct {
 	Path           string
 	StreamID       uint32
@@ -65,11 +72,8 @@ type TripleHeader struct {
 func (t *TripleHeader) GetPath() string {
 	return t.Path
 }
-func (t *TripleHeader) GetStreamID() uint32 {
-	return t.StreamID
-}
 
-// FieldToCtx parse triple Header that user defined, to ctx of server end
+// FieldToCtx parse triple Header that protocol defined, to ctx of server.
 func (t *TripleHeader) FieldToCtx() context.Context {
 	ctx := context.WithValue(context.Background(), "tri-service-version", t.ServiceVersion)
 	ctx = context.WithValue(ctx, "tri-service-group", t.ServiceGroup)
@@ -84,6 +88,14 @@ func (t *TripleHeader) FieldToCtx() context.Context {
 	return ctx
 }
 
+// TripleHeaderHandler is the triple imple of net.ProtocolHeaderHandler
+// it handles the change of triple header field and h2 field
+type TripleHeaderHandler struct {
+	Url *dubboCommon.URL
+	Ctx context.Context
+}
+
+// NewTripleHeaderHandler returns new TripleHeaderHandler
 func NewTripleHeaderHandler(url *dubboCommon.URL, ctx context.Context) h2Triple.ProtocolHeaderHandler {
 	return &TripleHeaderHandler{
 		Url: url,
@@ -91,21 +103,10 @@ func NewTripleHeaderHandler(url *dubboCommon.URL, ctx context.Context) h2Triple.
 	}
 }
 
-// TripleHeaderHandler Handler the change of triple header field and h2 field
-type TripleHeaderHandler struct {
-	Url *dubboCommon.URL
-	Ctx context.Context
-}
-
-// WriteTripleReqHeaderField called before comsumer call remote serve,
+// WriteTripleReqHeaderField called before consumer calling remote,
 // it parse field of url and ctx to HTTP2 Header field, developer must assure "tri-" prefix field be string
 // if not, it will cause panic!
 func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
-	//header[":method"] = []string{"POST"}
-	//header[":scheme"] = []string{"https"}
-	//header[":path"] = []string{t.Url.GetParam(":path", "")} //
-	//header[":authority"] = []string{t.Url.Location}
-	//header["content-type"] = []string{t.Url.GetParam("content-type", "application/grpc")}
 	header["user-agent"] = []string{"grpc-go/1.35.0-dev"}
 	header["tri-service-version"] = []string{getCtxVaSave(t.Ctx, "tri-service-version")}
 	header["tri-service-group"] = []string{getCtxVaSave(t.Ctx, "tri-service-group")}
@@ -119,16 +120,17 @@ func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http
 	} else {
 		header["authorization"] = v
 	}
-
 	return header
 }
 
+// WriteTripleFinalRspHeaderField returns trailers header fields that triple and grpc defined
 func (t *TripleHeaderHandler) WriteTripleFinalRspHeaderField(w http.ResponseWriter, grpcStatusCode int, grpcMessage string, traceProtoBin int) {
 	w.Header().Add(h2.TrailerPrefix+TrailerKeyGrpcStatus, strconv.Itoa(grpcStatusCode))   // sendMsg.st.Code()
 	w.Header().Add(h2.TrailerPrefix+TrailerKeyGrpcMessage, grpcMessage)                   //encodeGrpcMessage(""))
 	w.Header().Add(h2.TrailerPrefix+TrailerKeyTraceProtoBin, strconv.Itoa(traceProtoBin)) // sendMsg.st.Code()
 }
 
+// getCtxVaSave get key @fields value and return, if not exist, return empty string
 func getCtxVaSave(ctx context.Context, field string) string {
 	val, ok := ctx.Value(field).(string)
 	if ok {
@@ -137,7 +139,7 @@ func getCtxVaSave(ctx context.Context, field string) string {
 	return ""
 }
 
-// ReadFromH2MetaHeader read meta header field from h2 header, and parse it to ProtocolHeader as user defined
+// ReadFromH2MetaHeader read meta header field from h2 header, and parse it to ProtocolHeader as developer defined
 func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.ProtocolHeader {
 	tripleHeader := &TripleHeader{}
 	header := r.Header
@@ -165,9 +167,7 @@ func (t *TripleHeaderHandler) ReadFromTripleReqHeader(r *http.Request) h2Triple.
 		// todo: usage of these part of fields needs to be discussed later
 		//case "grpc-encoding":
 		//case "grpc-status":
-		//	tripleHeader.GrpcStatus = v[0]
 		//case "grpc-message":
-		//	tripleHeader.GrpcMessage = v[0]
 		default:
 		}
 	}

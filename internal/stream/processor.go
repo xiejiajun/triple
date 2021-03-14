@@ -15,12 +15,13 @@
  * limitations under the License.
  */
 
-package triple
+package stream
 
 import (
 	"bytes"
 	"errors"
 	h2Triple "github.com/dubbogo/net/http2/triple"
+	"github.com/dubbogo/triple/internal/buffer"
 	"sync"
 )
 import (
@@ -43,7 +44,7 @@ type processor interface {
 
 // baseProcessor is the basic impl of porcessor, which contains four base fields
 type baseProcessor struct {
-	stream     *serverStream
+	stream     *ServerStream
 	pkgHandler common.PackageHandler
 	serializer common.Dubbo3Serializer
 	closeChain chan struct{}
@@ -61,7 +62,7 @@ func (s *baseProcessor) handleRPCErr(err error) {
 
 // handleRPCSuccess send data and grpc success code with message
 func (s *baseProcessor) handleRPCSuccess(data []byte) {
-	s.stream.putSend(data, DataMsgType)
+	s.stream.PutSend(data, buffer.DataMsgType)
 	s.stream.WriteCloseMsgTypeWithStatus(status.New(codes.OK, ""))
 }
 
@@ -78,7 +79,7 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor can create unary processor
-func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc) (processor, error) {
+func newUnaryProcessor(s *ServerStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc) (processor, error) {
 	serilizer, err := common.GetDubbo3Serializer(codec.DefaultDubbo3SerializerName)
 	if err != nil {
 		logger.Error("newProcessor with serialization"+
@@ -99,7 +100,7 @@ func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc g
 }
 
 // processUnaryRPC can process unary rpc
-func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service Dubbo3GrpcService, header h2Triple.ProtocolHeader) ([]byte, error) {
+func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service common.Dubbo3GrpcService, header h2Triple.ProtocolHeader) ([]byte, error) {
 	readBuf := buf.Bytes()
 
 	pkgData, _ := p.pkgHandler.Frame2PkgData(readBuf)
@@ -127,7 +128,7 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service Dubbo3GrpcSer
 
 // runRPC is called by lower layer's stream
 func (s *unaryProcessor) runRPC() {
-	recvChan := s.stream.getRecv()
+	recvChan := s.stream.GetRecv()
 	go func() {
 		select {
 		case <-s.closeChain:
@@ -142,12 +143,12 @@ func (s *unaryProcessor) runRPC() {
 					s.handleRPCErr(errors.New(e.(string)))
 				}
 			}()
-			if recvMsg.err != nil {
-				logger.Error("error ,s.processUnaryRPC err = ", recvMsg.err)
-				s.handleRPCErr(status.Errorf(codes.Internal, "error ,s.processUnaryRPC err = %s", recvMsg.err))
+			if recvMsg.Err != nil {
+				logger.Error("error ,s.processUnaryRPC err = ", recvMsg.Err)
+				s.handleRPCErr(status.Errorf(codes.Internal, "error ,s.processUnaryRPC err = %s", recvMsg.Err))
 				return
 			}
-			rspData, err := s.processUnaryRPC(*recvMsg.buffer, s.stream.getService(), s.stream.getHeader())
+			rspData, err := s.processUnaryRPC(*recvMsg.Buffer, s.stream.getService(), s.stream.getHeader())
 			if err != nil {
 				s.handleRPCErr(err)
 				return
@@ -169,7 +170,7 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc) (processor, error) {
+func newStreamingProcessor(s *ServerStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc) (processor, error) {
 	serilizer, err := common.GetDubbo3Serializer(codec.DefaultDubbo3SerializerName)
 	if err != nil {
 		logger.Error("newProcessor with serlizationg ", codec.DefaultDubbo3SerializerName, " error")

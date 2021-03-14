@@ -26,22 +26,27 @@ import (
 )
 
 func init() {
-	common.SetDubbo3Serializer(DefaultDubbo3SerializerName, NewDubbo3CodeC)
+	common.SetDubbo3Serializer(DefaultDubbo3SerializerName, NewProtobufCodeC)
 }
 
+// DefaultDubbo3SerializerName is the default serializer name, triple use pb as serializer.
 const DefaultDubbo3SerializerName = "protobuf"
 
-// ProtobufCodeC is the impl of CodeC that use protobuf
+// ProtobufCodeC is the protobuf impl of Dubbo3Serializer interface
 type ProtobufCodeC struct {
 }
 
+// Marshal serialize interface @v to bytes
 func (p *ProtobufCodeC) Marshal(v interface{}) ([]byte, error) {
 	return proto.Marshal(v.(proto.Message))
 }
+
+// Unmarshal deserialize @data to interface
 func (p *ProtobufCodeC) Unmarshal(data []byte, v interface{}) error {
 	return proto.Unmarshal(data, v.(proto.Message))
 }
 
-func NewDubbo3CodeC() common.Dubbo3Serializer {
+// NewProtobufCodeC returns new ProtobufCodeC
+func NewProtobufCodeC() common.Dubbo3Serializer {
 	return &ProtobufCodeC{}
 }
