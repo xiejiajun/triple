@@ -47,7 +47,7 @@ func init() {
 	generator.RegisterPlugin(new(dubboGrpc))
 }
 
-// grpc is an implementation of the Go protocol buffer compiler's
+// grpc is an implementation of the Go protocol message compiler's
 // plugin architecture.  It generates bindings for gRPC-dubbo support.
 type dubboGrpc struct {
 	gen *generator.Generator

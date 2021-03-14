@@ -20,11 +20,12 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/apache/dubbo-go/common"
-	netTriple "github.com/dubbogo/net/http2/triple"
 )
+
 import (
+	"github.com/apache/dubbo-go/common"
 	"github.com/apache/dubbo-go/common/logger"
+	netTriple "github.com/dubbogo/net/http2/triple"
 	perrors "github.com/pkg/errors"
 )
 

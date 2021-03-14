@@ -19,54 +19,66 @@ package stream
 
 import (
 	"bytes"
-	h2Triple "github.com/dubbogo/net/http2/triple"
-	"github.com/dubbogo/triple/internal/buffer"
 )
 import (
 	dubboCommon "github.com/apache/dubbo-go/common"
 	"github.com/apache/dubbo-go/common/logger"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 	"google.golang.org/grpc"
 )
 import (
+	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/internal/status"
 	"github.com/dubbogo/triple/pkg/common"
 )
 
 /////////////////////////////////stream
-// Stream is not only a buffer stream
+// Stream is not only a message stream
 // but an abstruct stream in h2 defination
 type Stream interface {
 	// channel usage
-	PutRecv(data []byte, msgType buffer.MsgType)
-	PutSend(data []byte, msgType buffer.MsgType)
-	GetSend() <-chan buffer.BufferMsg
-	GetRecv() <-chan buffer.BufferMsg
-	PutSplitedDataRecv(splitedData []byte, msgType buffer.MsgType, handler common.PackageHandler)
+	PutRecv(data []byte, msgType message.MsgType)
+	PutSend(data []byte, msgType message.MsgType)
+	GetSend() <-chan message.Message
+	GetRecv() <-chan message.Message
+	PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, handler common.PackageHandler)
 	Close()
 }
 
+// baseStream ServerStream and clientStream work detail:
+// in server end, when unary call, msg from client is send to recvChan, and then it is read and push to processor to get response.
+// in client end, when unary call, msg from server is send to recvChan, and then response in invoke method.
+/*
+client  ---> send chan ---> triple ---> recv Chan ---> processor
+			sendBuf						recvBuf			   |
+		|	clientStream |          | serverStream |       |
+			recvBuf						sendBuf			   V
+client <--- recv chan <--- triple <--- send chan <---  response
+*/
 // baseStream is the basic  impl of stream interface, it impl for basic function of stream
 type baseStream struct {
-	recvBuf *buffer.BufferMsgChain
-	sendBuf *buffer.BufferMsgChain
+	recvBuf *message.MsgChain
+	sendBuf *message.MsgChain
 	service common.Dubbo3GrpcService
 	// splitBuffer is used to cache splited data from network, if exceed
-	splitBuffer buffer.BufferMsg
+	splitBuffer message.Message
 	// fromFrameHeaderDataSize is got from dataFrame's header, which is 5 bytes and contains the total data size
 	// of this package
 	// when fromFrameHeaderDataSize is zero, its means we should parse header first 5byte, and then read data
 	fromFrameHeaderDataSize uint32
 }
 
+// WriteCloseMsgTypeWithStatus put bufferMsg with status:  @st and type: ServerStreamCloseMsgType
 func (s *baseStream) WriteCloseMsgTypeWithStatus(st *status.Status) {
-	s.sendBuf.Put(buffer.BufferMsg{
+	s.sendBuf.Put(message.Message{
 		Status:  st,
-		MsgType: buffer.ServerStreamCloseMsgType,
+		MsgType: message.ServerStreamCloseMsgType,
 	})
 }
 
-func (s *baseStream) PutRecv(data []byte, msgType buffer.MsgType) {
-	s.recvBuf.Put(buffer.BufferMsg{
+// PutRecv put message type and @data to recvBuf
+func (s *baseStream) PutRecv(data []byte, msgType message.MsgType) {
+	s.recvBuf.Put(message.Message{
 		Buffer:  bytes.NewBuffer(data),
 		MsgType: msgType,
 	})
@@ -74,8 +86,8 @@ func (s *baseStream) PutRecv(data []byte, msgType buffer.MsgType) {
 
 // putSplitedDataRecv is called when receive from tripleNetwork, dealing with big package partial to create the whole pkg
 // @msgType Must be data
-func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType buffer.MsgType, frameHandler common.PackageHandler) {
-	if msgType != buffer.DataMsgType {
+func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType message.MsgType, frameHandler common.PackageHandler) {
+	if msgType != message.DataMsgType {
 		return
 	}
 	if s.fromFrameHeaderDataSize == 0 {
@@ -101,28 +113,20 @@ func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType buffer.MsgTy
 	}
 }
 
-func (s *baseStream) PutSend(data []byte, msgType buffer.MsgType) {
-	s.sendBuf.Put(buffer.BufferMsg{
+// PutRecv put message type and @data to sendBuf
+func (s *baseStream) PutSend(data []byte, msgType message.MsgType) {
+	s.sendBuf.Put(message.Message{
 		Buffer:  bytes.NewBuffer(data),
 		MsgType: msgType,
 	})
 }
 
 // getRecv get channel of receiving message
-// in server end, when unary call, msg from client is send to recvChan, and then it is read and push to processor to get response.
-// in client end, when unary call, msg from server is send to recvChan, and then response in invoke method.
-/*
-client  ---> send chan ---> triple ---> recv Chan ---> processor
-			sendBuf						recvBuf			   |
-		|	clientStream |          | serverStream |       |
-			recvBuf						sendBuf			   V
-client <--- recv chan <--- triple <--- send chan <---  response
-*/
-func (s *baseStream) GetRecv() <-chan buffer.BufferMsg {
+func (s *baseStream) GetRecv() <-chan message.Message {
 	return s.recvBuf.Get()
 }
 
-func (s *baseStream) GetSend() <-chan buffer.BufferMsg {
+func (s *baseStream) GetSend() <-chan message.Message {
 	return s.sendBuf.Get()
 }
 
@@ -134,31 +138,31 @@ func (s *baseStream) Close() {
 func newBaseStream(service common.Dubbo3GrpcService) *baseStream {
 	// stream and pkgHeader are the same level
 	return &baseStream{
-		recvBuf: buffer.NewBufferMsgChain(),
-		sendBuf: buffer.NewBufferMsgChain(),
+		recvBuf: message.NewBufferMsgChain(),
+		sendBuf: message.NewBufferMsgChain(),
 		service: service,
-		splitBuffer: buffer.BufferMsg{
+		splitBuffer: message.Message{
 			Buffer: bytes.NewBuffer(make([]byte, 0)),
 		},
 	}
 }
 
-// ServerStream is running in server end
-type ServerStream struct {
+// serverStream is running in server end
+type serverStream struct {
 	baseStream
 	processor processor
 	header    h2Triple.ProtocolHeader
 }
 
-func (ss *ServerStream) Close() {
+func (ss *serverStream) Close() {
 	// close processor, as there may be rpc call that is waiting for process, let them returns canceled code
 	ss.processor.close()
 }
 
-func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, url *dubboCommon.URL, service common.Dubbo3GrpcService) (*ServerStream, error) {
+func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, url *dubboCommon.URL, service common.Dubbo3GrpcService) (*serverStream, error) {
 	baseStream := newBaseStream(service)
 
-	serverStream := &ServerStream{
+	serverStream := &serverStream{
 		baseStream: *baseStream,
 		header:     header,
 	}
@@ -182,12 +186,14 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, url *dubb
 	return serverStream, nil
 }
 
-func (s *ServerStream) getService() common.Dubbo3GrpcService {
-	return s.service
+// getService return RPCService that user defined and registered.
+func (ss *serverStream) getService() common.Dubbo3GrpcService {
+	return ss.service
 }
 
-func (s *ServerStream) getHeader() h2Triple.ProtocolHeader {
-	return s.header
+// getHeader returns ProtocolHeader of stream
+func (ss *serverStream) getHeader() h2Triple.ProtocolHeader {
+	return ss.header
 }
 
 // clientStream is running in client end
@@ -195,6 +201,7 @@ type clientStream struct {
 	baseStream
 }
 
+// NewClientStream returns new client stream
 func NewClientStream() *clientStream {
 	baseStream := newBaseStream(nil)
 	newclientStream := &clientStream{
@@ -203,7 +210,7 @@ func NewClientStream() *clientStream {
 	return newclientStream
 }
 
-// todo close logic
+// Close closes stream
 func (cs *clientStream) Close() {
 	cs.baseStream.Close()
 }

@@ -1,11 +1,35 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package stream
+
+import (
+	"testing"
+	"time"
+)
 
 import (
 	"github.com/apache/dubbo-go/protocol"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"testing"
-	"time"
+)
+
+import (
+	"github.com/dubbogo/triple/internal/message"
 )
 
 type TestRPCService struct {
@@ -32,8 +56,8 @@ func TestBaseUserStream(t *testing.T) {
 	assert.Equal(t, baseUserStream.service, service)
 
 	// get msg
-	sendGetChan := baseUserStream.getSend()
-	recvGetChan := baseUserStream.getRecv()
+	sendGetChan := baseUserStream.GetSend()
+	recvGetChan := baseUserStream.GetRecv()
 	closeChan := make(chan struct{})
 	testData := []byte("test message of TestBaseUserStream")
 	counter := 0
@@ -46,12 +70,12 @@ func TestBaseUserStream(t *testing.T) {
 				return
 			case sendGetBuf := <-sendGetChan:
 				counter++
-				assert.Equal(t, sendGetBuf.buffer.Bytes(), testData)
-				assert.Equal(t, sendGetBuf.msgType, DataMsgType)
+				assert.Equal(t, sendGetBuf.Bytes(), testData)
+				assert.Equal(t, sendGetBuf.MsgType, message.DataMsgType)
 			case recvGetBuf := <-recvGetChan:
 				counter++
-				assert.Equal(t, recvGetBuf.buffer.Bytes(), testData)
-				assert.Equal(t, recvGetBuf.msgType, ServerStreamCloseMsgType)
+				assert.Equal(t, recvGetBuf.Bytes(), testData)
+				assert.Equal(t, recvGetBuf.MsgType, message.ServerStreamCloseMsgType)
 			}
 		}
 
@@ -59,8 +83,8 @@ func TestBaseUserStream(t *testing.T) {
 
 	// put msg
 	for i := 0; i < 500; i++ {
-		baseUserStream.putRecv(testData, ServerStreamCloseMsgType)
-		baseUserStream.putSend(testData, DataMsgType)
+		baseUserStream.PutRecv(testData, message.ServerStreamCloseMsgType)
+		baseUserStream.PutSend(testData, message.DataMsgType)
 	}
 	time.Sleep(time.Second)
 	assert.Equal(t, counter, 1000)

@@ -20,55 +20,57 @@ package stream
 import (
 	"bytes"
 	"errors"
-	h2Triple "github.com/dubbogo/net/http2/triple"
-	"github.com/dubbogo/triple/internal/buffer"
 	"sync"
 )
 import (
 	"github.com/apache/dubbo-go/common/logger"
+	h2Triple "github.com/dubbogo/net/http2/triple"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
 import (
 	"github.com/dubbogo/triple/internal/codec"
 	"github.com/dubbogo/triple/internal/codes"
+	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/internal/status"
 	"github.com/dubbogo/triple/pkg/common"
 )
 
-// processor is the interface, with func runRPC
+// processor is the interface, with func runRPC and close
+// it process server RPC method that user defined and get response
 type processor interface {
 	runRPC()
 	close()
 }
 
-// baseProcessor is the basic impl of porcessor, which contains four base fields
+// baseProcessor is the basic impl of processor, which contains four base fields, such as rpc status handle function
 type baseProcessor struct {
-	stream     *ServerStream
+	stream     *serverStream
 	pkgHandler common.PackageHandler
 	serializer common.Dubbo3Serializer
 	closeChain chan struct{}
 	quitOnce   sync.Once
 }
 
-func (s *baseProcessor) handleRPCErr(err error) {
+func (p *baseProcessor) handleRPCErr(err error) {
 	appStatus, ok := status.FromError(err)
 	if !ok {
 		err = status.Errorf(codes.Unknown, err.Error())
 		appStatus, _ = status.FromError(err)
 	}
-	s.stream.WriteCloseMsgTypeWithStatus(appStatus)
+	p.stream.WriteCloseMsgTypeWithStatus(appStatus)
 }
 
 // handleRPCSuccess send data and grpc success code with message
-func (s *baseProcessor) handleRPCSuccess(data []byte) {
-	s.stream.PutSend(data, buffer.DataMsgType)
-	s.stream.WriteCloseMsgTypeWithStatus(status.New(codes.OK, ""))
+func (p *baseProcessor) handleRPCSuccess(data []byte) {
+	p.stream.PutSend(data, message.DataMsgType)
+	p.stream.WriteCloseMsgTypeWithStatus(status.New(codes.OK, ""))
 }
 
-func (bp *baseProcessor) close() {
-	bp.quitOnce.Do(func() {
-		close(bp.closeChain)
+// close closes processor once
+func (p *baseProcessor) close() {
+	p.quitOnce.Do(func() {
+		close(p.closeChain)
 	})
 }
 
@@ -79,7 +81,7 @@ type unaryProcessor struct {
 }
 
 // newUnaryProcessor can create unary processor
-func newUnaryProcessor(s *ServerStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc) (processor, error) {
+func newUnaryProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.MethodDesc) (processor, error) {
 	serilizer, err := common.GetDubbo3Serializer(codec.DefaultDubbo3SerializerName)
 	if err != nil {
 		logger.Error("newProcessor with serialization"+
@@ -127,37 +129,37 @@ func (p *unaryProcessor) processUnaryRPC(buf bytes.Buffer, service common.Dubbo3
 }
 
 // runRPC is called by lower layer's stream
-func (s *unaryProcessor) runRPC() {
-	recvChan := s.stream.GetRecv()
+func (p *unaryProcessor) runRPC() {
+	recvChan := p.stream.GetRecv()
 	go func() {
 		select {
-		case <-s.closeChain:
+		case <-p.closeChain:
 			// in this case, server doesn't receive data but got close signal, it returns canceled code
 			logger.Warn("unaryProcessor closed by force")
-			s.handleRPCErr(status.Errorf(codes.Canceled, "processor has been canceled!"))
+			p.handleRPCErr(status.Errorf(codes.Canceled, "processor has been canceled!"))
 			return
 		case recvMsg := <-recvChan:
 			// in this case, server unary processor have the chance to do process and return result
 			defer func() {
 				if e := recover(); e != nil {
-					s.handleRPCErr(errors.New(e.(string)))
+					p.handleRPCErr(errors.New(e.(string)))
 				}
 			}()
 			if recvMsg.Err != nil {
 				logger.Error("error ,s.processUnaryRPC err = ", recvMsg.Err)
-				s.handleRPCErr(status.Errorf(codes.Internal, "error ,s.processUnaryRPC err = %s", recvMsg.Err))
+				p.handleRPCErr(status.Errorf(codes.Internal, "error ,s.processUnaryRPC err = %s", recvMsg.Err))
 				return
 			}
-			rspData, err := s.processUnaryRPC(*recvMsg.Buffer, s.stream.getService(), s.stream.getHeader())
+			rspData, err := p.processUnaryRPC(*recvMsg.Buffer, p.stream.getService(), p.stream.getHeader())
 			if err != nil {
-				s.handleRPCErr(err)
+				p.handleRPCErr(err)
 				return
 			}
 
 			// TODO: status sendResponse should has err, then writeStatus(err) use one function and defer
 			// it's enough that unary processor just send data msg to stream layer
 			// rpc status logic just let stream layer to handle
-			s.handleRPCSuccess(rspData)
+			p.handleRPCSuccess(rspData)
 			return
 		}
 	}()
@@ -170,7 +172,7 @@ type streamingProcessor struct {
 }
 
 // newStreamingProcessor can create new streaming processor
-func newStreamingProcessor(s *ServerStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc) (processor, error) {
+func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, desc grpc.StreamDesc) (processor, error) {
 	serilizer, err := common.GetDubbo3Serializer(codec.DefaultDubbo3SerializerName)
 	if err != nil {
 		logger.Error("newProcessor with serlizationg ", codec.DefaultDubbo3SerializerName, " error")
@@ -193,7 +195,10 @@ func newStreamingProcessor(s *ServerStream, pkgHandler common.PackageHandler, de
 func (sp *streamingProcessor) runRPC() {
 	serverUserstream := newServerUserStream(sp.stream, sp.serializer, sp.pkgHandler)
 	go func() {
-		sp.streamDesc.Handler(sp.stream.getService(), serverUserstream)
+		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
+			sp.handleRPCErr(err)
+			return
+		}
 		// for stream rpc, processor should send CloseMsg to lower stream layer to call close
 		// but unary rpc not, unary rpc processor only send data to stream layer
 		sp.handleRPCSuccess(nil)

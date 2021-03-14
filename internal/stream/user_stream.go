@@ -19,13 +19,14 @@ package stream
 
 import (
 	"context"
+)
+import (
 	"github.com/apache/dubbo-go/common/logger"
-	"github.com/dubbogo/triple/internal/buffer"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/metadata"
 )
-
 import (
+	"github.com/dubbogo/triple/internal/message"
 	"github.com/dubbogo/triple/pkg/common"
 )
 
@@ -55,7 +56,7 @@ func (ss *baseUserStream) SendMsg(m interface{}) error {
 		return err
 	}
 	rspFrameData := ss.pkgHandler.Pkg2FrameData(replyData)
-	ss.stream.PutSend(rspFrameData, buffer.DataMsgType)
+	ss.stream.PutSend(rspFrameData, message.DataMsgType)
 	return nil
 }
 
