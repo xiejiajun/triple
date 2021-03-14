@@ -2,14 +2,9 @@ module github.com/dubbogo/triple
 
 go 1.15
 
-replace github.com/apache/dubbo-go v1.5.5 => ../dubbo-go
-replace (
-	github.com/dubbogo/net v0.0.2-0.20210312095142-e0595532fde0 => ../net
-)
-
 require (
 	github.com/apache/dubbo-go v1.5.5
-	github.com/dubbogo/net v0.0.2-0.20210312095142-e0595532fde0
+	github.com/dubbogo/net v0.0.2-0.20210314060136-1d6159530542
 	github.com/golang/protobuf v1.4.3
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0

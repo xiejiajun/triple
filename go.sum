@@ -222,6 +222,8 @@ github.com/dubbogo/net v0.0.2-0.20210301082523-598c5b483149 h1:5l836FmJx+o4ZQ8HQ
 github.com/dubbogo/net v0.0.2-0.20210301082523-598c5b483149/go.mod h1:B6/ka3g8VzcyrmdCH4VkHP1K0aHeI37FmclS+TCwIBU=
 github.com/dubbogo/net v0.0.2-0.20210312095142-e0595532fde0 h1:py5ROrTvAmvYO5IK5gxGPwbGFmo7AHrZFxp7avqOSJY=
 github.com/dubbogo/net v0.0.2-0.20210312095142-e0595532fde0/go.mod h1:B6/ka3g8VzcyrmdCH4VkHP1K0aHeI37FmclS+TCwIBU=
+github.com/dubbogo/net v0.0.2-0.20210314060136-1d6159530542 h1:OI/gVOgFquJmcZ08iMyYikKT6Yv+SDSQwXKrnYxp1Ho=
+github.com/dubbogo/net v0.0.2-0.20210314060136-1d6159530542/go.mod h1:B6/ka3g8VzcyrmdCH4VkHP1K0aHeI37FmclS+TCwIBU=
 github.com/dubbogo/triple v0.0.0-20210209063802-ba75c3ed4425/go.mod h1:H0+IdFdLkIm5m8rCn8ANoJQuIp+K1U/7ifm8f4EUPvA=
 github.com/dubbogo/triple v0.0.0-20210301083516-185f5a3b1234/go.mod h1:v1szRcUO/P3lbe2NveWHBLsI4d3fF9tVCg5f8CB3WE8=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
