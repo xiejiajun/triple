@@ -19,6 +19,7 @@ package codec
 
 import (
 	"context"
+	"github.com/apache/dubbo-go/common/constant"
 	h2 "github.com/dubbogo/net/http2"
 	h2Triple "github.com/dubbogo/net/http2/triple"
 	"net/http"
@@ -108,8 +109,14 @@ func NewTripleHeaderHandler(url *dubboCommon.URL, ctx context.Context) h2Triple.
 // if not, it will cause panic!
 func (t *TripleHeaderHandler) WriteTripleReqHeaderField(header http.Header) http.Header {
 	header["user-agent"] = []string{"grpc-go/1.35.0-dev"}
-	header["tri-service-version"] = []string{getCtxVaSave(t.Ctx, "tri-service-version")}
-	header["tri-service-group"] = []string{getCtxVaSave(t.Ctx, "tri-service-group")}
+	// get from ctx
+	//header["tri-service-version"] = []string{getCtxVaSave(t.Ctx, "tri-service-version")}
+	//header["tri-service-group"] = []string{getCtxVaSave(t.Ctx, "tri-service-group")}
+
+	// now we choose get from url
+	header["tri-service-version"] = []string{t.Url.GetParam(constant.APP_VERSION_KEY, "")}
+	header["tri-service-group"] = []string{t.Url.GetParam(constant.GROUP_KEY, "")}
+
 	header["tri-req-id"] = []string{getCtxVaSave(t.Ctx, "tri-req-id")}
 	header["tri-trace-traceid"] = []string{getCtxVaSave(t.Ctx, "tri-trace-traceid")}
 	header["tri-trace-rpcid"] = []string{getCtxVaSave(t.Ctx, "tri-trace-rpcid")}

@@ -25,8 +25,6 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 )
 
-
-
 func init() {
 	common.SetPackageHandler(common.TRIPLE, NewTriplePkgHandler)
 }
@@ -34,7 +32,6 @@ func init() {
 // TriplePackageHandler is the imple of PackageHandler, and it handles data package of triple
 // e.g. now it impl as deal with pkg data as: [:5]is length and [5:lenght] is body
 type TriplePackageHandler struct {
-	header *TripleHeader
 }
 
 // Frame2PkgData/Pkg2FrameData is not as useless!

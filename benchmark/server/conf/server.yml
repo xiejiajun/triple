@@ -10,7 +10,7 @@ application:
 
 # registry config
 registries:
-  "demoConsul":
+  "demoZk":
     protocol: "zookeeper"
     timeout: "3s"
     address: "127.0.0.1:2181"
@@ -18,8 +18,8 @@ registries:
 # service config
 services:
   "GrpcGreeterImpl":
-    registry: "demoConsul"
-    protocol: "dubbo3"
+    registry: "demoZk"
+    protocol: "tri"
     interface: "org.apache.dubbo.GreeterGrpc$IGreeter"
     loadbalance: "random"
     warmup: "100"
@@ -31,8 +31,8 @@ services:
 
 # protocol config
 protocols:
-  "dubbo3":
-    name: "dubbo3"
+  "tri":
+    name: "tri"
     port: 20001
 
 protocol_conf:

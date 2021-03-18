@@ -24,8 +24,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/dubbogo/triple/internal/status"
+	"github.com/dubbogo/triple/pkg/config"
 	"io"
-	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -41,7 +41,6 @@ import (
 	h2Triple "github.com/dubbogo/net/http2/triple"
 	"github.com/golang/protobuf/proto"
 	perrors "github.com/pkg/errors"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 )
 
@@ -73,8 +72,8 @@ type H2Controller struct {
 
 	closeChan chan struct{}
 
-	// defaultReadBufferSize is 10M by default
-	defaultReadBufferSize int
+	// option is 10M by default
+	option *config.Option
 }
 
 // skipHeader is to skip first 5 byte from dataframe with header
@@ -93,7 +92,7 @@ func skipHeader(frameData []byte) ([]byte, uint32) {
 func (hc *H2Controller) readSplitData(rBody io.ReadCloser) chan message.Message {
 	cbm := make(chan message.Message)
 	go func() {
-		buf := make([]byte, hc.defaultReadBufferSize)
+		buf := make([]byte, hc.option.BufferSize)
 		for {
 			splitBuffer := message.Message{
 				Buffer: bytes.NewBuffer(make([]byte, 0)),
@@ -174,7 +173,9 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 			logger.Errorf("creat server stream error = %v\n", err)
 			rspErrMsg := fmt.Sprintf("creat server stream error = %v\n", err)
 			w.WriteHeader(400)
-			w.Write([]byte(rspErrMsg))
+			if _, err := w.Write([]byte(rspErrMsg)); err != nil {
+				logger.Errorf("write back rsp error message %s, error", rspErrMsg)
+			}
 			return
 			// todo handle interface/method not found error with grpc-status
 		}
@@ -250,16 +251,23 @@ func getMethodAndStreamDescMap(ds common.Dubbo3GrpcService) (map[string]grpc.Met
 	return sdMap, strMap, nil
 }
 
-// NewH2Controller can create H2Controller with impl @rpcServiceMap and url
-func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, url *dubboCommon.URL) (*H2Controller, error) {
+// addDefaultOption fill default options to @opt
+func addDefaultOption(opt *config.Option) *config.Option {
+	if opt == nil {
+		opt = &config.Option{}
+	}
+	opt.SetEmptyFieldDefaultConfig()
+	return opt
+}
 
+// NewH2Controller can create H2Controller with impl @rpcServiceMap and url
+// @opt can be nil or configured by user
+func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, url *dubboCommon.URL, opt *config.Option) (*H2Controller, error) {
 	var pkgHandler common.PackageHandler
 
 	if url != nil {
 		pkgHandler, _ = common.GetPackagerHandler(url.Protocol)
 	}
-	defaultMaxCurrentStream := atomic.Uint32{}
-	defaultMaxCurrentStream.Store(math.MaxUint32)
 
 	// new http client struct
 	var client http.Client
@@ -274,12 +282,12 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, url *dubboCommon.UR
 	}
 
 	h2c := &H2Controller{
-		url:                   url,
-		client:                client,
-		rpcServiceMap:         rpcServiceMap,
-		pkgHandler:            pkgHandler,
-		defaultReadBufferSize: common.DefaultHttp2ControllerReadBufferSize,
-		closeChan:             make(chan struct{}),
+		url:           url,
+		client:        client,
+		rpcServiceMap: rpcServiceMap,
+		pkgHandler:    pkgHandler,
+		option:        addDefaultOption(opt),
+		closeChan:     make(chan struct{}),
 	}
 	return h2c, nil
 }
@@ -309,7 +317,7 @@ func (hc *H2Controller) newServerStreamFromTripleHedaer(data h2Triple.ProtocolHe
 	}
 	service, ok := serviceInterface.(common.Dubbo3GrpcService)
 	if !ok {
-		return nil, status.Err(codes.Internal, "can't assert service interface to dubbo RPCService")
+		return nil, status.Err(codes.Internal, "can't assert impl of interface "+interfaceKey+" to dubbo RPCService")
 	}
 
 	mdMap, strMap, err := getMethodAndStreamDescMap(service)
@@ -376,7 +384,10 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 	go func() {
 		rsp, err := hc.client.Post("https://"+hc.address+path, "application/grpc+proto", &stremaReq)
 		if err != nil {
-			panic(err)
+			logger.Errorf("http2 request error = %s", err)
+			// close send stream and return
+			close(closeChan)
+			return
 		}
 		ch := hc.readSplitData(rsp.Body)
 	LOOP:
@@ -405,6 +416,10 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 	}()
 
 	pkgHandler, err := common.GetPackagerHandler(hc.url.Protocol)
+	if err != nil {
+		logger.Errorf("triple get package handler error = %v", err)
+		return nil, err
+	}
 	return stream.NewClientUserStream(clientStream, serilizer, pkgHandler), nil
 }
 
@@ -435,7 +450,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, data []byt
 		return err
 	}
 
-	readBuf := make([]byte, hc.defaultReadBufferSize)
+	readBuf := make([]byte, hc.option.BufferSize)
 
 	// splitBuffer is to temporarily store collected split data, and add them together
 	splitBuffer := message.Message{
@@ -538,4 +553,14 @@ LOOP:
 // Destroy destroys H2Controller and force close all related goroutine
 func (hc *H2Controller) Destroy() {
 	close(hc.closeChan)
+}
+
+func (hc *H2Controller) IsAvailable() bool {
+	select {
+	case <-hc.closeChan:
+		return false
+	default:
+		return true
+	}
+	// todo check if controller's http client is available
 }

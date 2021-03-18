@@ -103,7 +103,6 @@ func (s *baseStream) PutSplitedDataRecv(splitedData []byte, msgType message.MsgT
 	s.splitBuffer.Write(splitedData)
 	if s.splitBuffer.Len() > int(s.fromFrameHeaderDataSize) {
 		panic("Receive Splited Data is bigger than wanted!!!")
-		return
 	}
 
 	if s.splitBuffer.Len() == int(s.fromFrameHeaderDataSize) {
@@ -179,6 +178,10 @@ func NewServerStream(header h2Triple.ProtocolHeader, desc interface{}, url *dubb
 	} else {
 		logger.Error("grpc desc invalid:", desc)
 		return nil, nil
+	}
+	if err != nil {
+		logger.Errorf("new processor error with err = %s\n", err)
+		return nil, err
 	}
 
 	serverStream.processor.runRPC()

@@ -62,17 +62,18 @@ func (bm *Message) GetMsgType() MsgType {
 
 // MsgChain contain the chan of Message
 type MsgChain struct {
-	c   chan Message
-	err error
+	c chan Message
 }
 
+// NewBufferMsgChain returns new MsgChain
 func NewBufferMsgChain() *MsgChain {
 	b := &MsgChain{
-		c: make(chan Message, 0),
+		c: make(chan Message),
 	}
 	return b
 }
 
+// Put if stream close by force, the Put function doesn't send anything.
 func (b *MsgChain) Put(r Message) {
 	if b.c != nil {
 		b.c <- r

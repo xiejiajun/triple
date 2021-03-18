@@ -18,6 +18,12 @@
 package common
 
 const (
+	// TRIPLE is triple protocol name
 	TRIPLE = "tri"
+
+	// DefaultHttp2ControllerReadBufferSize is default read buffer size of triple client/server
 	DefaultHttp2ControllerReadBufferSize = 1000000
+
+	// DefaultTimeout is default timeout seconds of triple client
+	DefaultTimeout = 15
 )

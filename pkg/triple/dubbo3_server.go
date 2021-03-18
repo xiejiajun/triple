@@ -18,6 +18,7 @@
 package triple
 
 import (
+	"github.com/dubbogo/triple/pkg/config"
 	"io"
 	"net"
 	"net/http"
@@ -37,18 +38,21 @@ type TripleServer struct {
 	rpcServiceMap *sync.Map
 	url           *dubboCommon.URL
 	h2Controller  *H2Controller
-	once          sync.Once // use when destroy
 	closeChain    chan struct{}
+
+	// config
+	opt *config.Option
 }
 
 // NewTripleServer can create Server with url and some user impl providers stored in @serviceMap
 // @serviceMap should be sync.Map: "interfaceKey" -> Dubbo3GrpcService
-func NewTripleServer(url *dubboCommon.URL, serviceMap *sync.Map) *TripleServer {
+func NewTripleServer(url *dubboCommon.URL, serviceMap *sync.Map, opt *config.Option) *TripleServer {
 	return &TripleServer{
 		addr:          url.Location,
 		rpcServiceMap: serviceMap,
 		url:           url,
 		closeChain:    make(chan struct{}, 1),
+		opt:           opt,
 	}
 }
 
@@ -100,7 +104,7 @@ func (t *TripleServer) run() {
 // handleRawConn create a H2 Controller to deal with new conn
 func (t *TripleServer) handleRawConn(conn net.Conn) error {
 	srv := &http2.Server{}
-	h2Controller, err := NewH2Controller(true, t.rpcServiceMap, t.url)
+	h2Controller, err := NewH2Controller(true, t.rpcServiceMap, t.url, t.opt)
 	if err != nil {
 		return err
 	}

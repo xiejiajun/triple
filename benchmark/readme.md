@@ -1,6 +1,8 @@
 
 ### dubbo-go triple benchmark
 
+before using benchmark, you shuold be sure that triple has import dubbo-go 3.0
+
 derived from grpc-go benchmark
 
 

@@ -21,14 +21,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/apache/dubbo-go/common"
-	"github.com/apache/dubbo-go/common/constant"
 	"github.com/apache/dubbo-go/common/logger"
 	"github.com/dubbogo/triple/benchmark/client/pkg"
 	pb "github.com/dubbogo/triple/benchmark/protobuf"
 	"github.com/dubbogo/triple/benchmark/stats"
 	"github.com/dubbogo/triple/internal/syscall"
-	"github.com/dubbogo/triple/pkg/triple"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -89,8 +86,15 @@ func main() {
 	if err != nil {
 		logger.Error("Error creating file: %v", err)
 	}
-	defer cf.Close()
-	pprof.StartCPUProfile(cf)
+	defer func() {
+		if err := cf.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	if err := pprof.StartCPUProfile(cf); err != nil {
+		panic(err)
+	}
 	cpuBeg := syscall.GetCPUTime()
 
 	ctx := context.Background()
@@ -105,7 +109,11 @@ func main() {
 	if err != nil {
 		logger.Error("Error creating file: %v", err)
 	}
-	defer mf.Close()
+	defer func() {
+		if err := mf.Close(); err != nil {
+			panic(err)
+		}
+	}()
 	runtime.GC() // materialize all statistics
 	if err := pprof.WriteHeapProfile(mf); err != nil {
 		logger.Error("Error writing memory profile: %v", err)
@@ -150,7 +158,9 @@ func runWithClient(ctx context.Context, in *pb.BigData, warmDeadline, endDeadlin
 
 				elapsed := time.Since(start)
 				if start.After(warmDeadline) {
-					hist.Add(elapsed.Nanoseconds())
+					if err := hist.Add(elapsed.Nanoseconds()); err != nil {
+						panic(err)
+					}
 				}
 			}
 		}()

@@ -19,7 +19,7 @@ package triple
 
 import (
 	"context"
-	"net"
+	"github.com/dubbogo/triple/pkg/config"
 	"reflect"
 	"sync"
 )
@@ -33,21 +33,27 @@ import (
 
 // TripleClient client endpoint for client end
 type TripleClient struct {
-	conn         net.Conn
 	h2Controller *H2Controller
 	addr         string
 	Invoker      reflect.Value
 	url          *dubboCommon.URL
-	once         sync.Once //use when destroy
+
+	//once is used when destroy
+	once sync.Once
+
+	// triple config
+	opt *config.Option
 }
 
 // NewTripleClient create triple client with given @url,
 // it's return tripleClient , contains invoker, and contain triple conn
 // @url is the invocation url when dubbo client invoct. Now, triple only use Location and Protocol field of url.
 // @impl must have method: GetDubboStub(cc *dubbo3.TripleConn) interface{}, to be capable with grpc
-func NewTripleClient(url *dubboCommon.URL, impl interface{}) (*TripleClient, error) {
+// @opt is used init http2 controller, if it's nil, use the default config
+func NewTripleClient(url *dubboCommon.URL, impl interface{}, opt *config.Option) (*TripleClient, error) {
 	tripleClient := &TripleClient{
 		url: url,
+		opt: opt,
 	}
 	// start triple client connection,
 	if err := tripleClient.connect(url); err != nil {
@@ -68,7 +74,7 @@ func (t *TripleClient) connect(url *dubboCommon.URL) error {
 	logger.Info("want to connect to url = ", url.Location)
 	t.addr = url.Location
 	var err error
-	t.h2Controller, err = NewH2Controller(false, nil, url)
+	t.h2Controller, err = NewH2Controller(false, nil, url, t.opt)
 	if err != nil {
 		logger.Errorf("dubbo client new http2 controller error = %v", err)
 		return err
@@ -80,7 +86,7 @@ func (t *TripleClient) connect(url *dubboCommon.URL) error {
 // Request call h2Controller to send unary rpc req to server
 // @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
 // @arg is request body
-func (t *TripleClient) Request(ctx context.Context, path string, arg proto.Message, reply interface{}) error {
+func (t *TripleClient) Request(ctx context.Context, path string, arg, reply proto.Message) error {
 	reqData, err := proto.Marshal(arg)
 	if err != nil {
 		logger.Errorf("client request marshal error = %v", err)
@@ -116,7 +122,10 @@ func (t *TripleClient) Close() {
 	t.h2Controller.Destroy()
 }
 
-// todo IsAvailable
+// IsAvailable returns if ht
 func (t *TripleClient) IsAvailable() bool {
-	return true
+	if t.h2Controller == nil {
+		return false
+	}
+	return t.h2Controller.IsAvailable()
 }

@@ -72,15 +72,22 @@ func (g *GreeterProvider) Dubbo3SayHello(svr pb.Dubbo3Greeter_Dubbo3SayHelloServ
 	}
 	fmt.Println("server server recv 2 = ", c2)
 	c3, err := svr.Recv()
+	if err != nil {
+		return err
+	}
 	fmt.Println("server server recv 3 = ", c3)
 
-	svr.Send(&pb.Dubbo3HelloReply{
+	if err := svr.Send(&pb.Dubbo3HelloReply{
 		Msg: c.Myname + c2.Myname,
-	})
+	}); err != nil {
+		panic(err)
+	}
 	fmt.Println("server server send 1 = ", c.Myname+c2.Myname)
-	svr.Send(&pb.Dubbo3HelloReply{
+	if err := svr.Send(&pb.Dubbo3HelloReply{
 		Msg: c3.Myname,
-	})
+	}); err != nil {
+		panic(err)
+	}
 	fmt.Println("server server send 2 = ", c3.Myname)
 	return nil
 }

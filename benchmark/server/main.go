@@ -40,8 +40,7 @@ import (
 )
 
 var (
-	testName        = flag.String("test_name", "server", "Name of the test used for creating profiles.")
-	survivalTimeout = int(3 * time.Second)
+	testName = flag.String("test_name", "server", "Name of the test used for creating profiles.")
 )
 
 func main() {
@@ -56,7 +55,9 @@ func main() {
 		logger.Error("Failed to create file: %v", err)
 	}
 	defer cf.Close()
-	pprof.StartCPUProfile(cf)
+	if err := pprof.StartCPUProfile(cf); err != nil {
+		panic(err)
+	}
 	cpuBeg := ts_call.GetCPUTime()
 
 	config.SetProviderService(pkg.NewGreeterProvider())

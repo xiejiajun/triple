@@ -394,7 +394,8 @@ func (s *Stats) computeLatencies(result *BenchResults) {
 		MinValue:       minDuration,
 	})
 	for _, d := range s.hw.durations {
-		s.hw.histogram.Add(int64(d))
+		if err := s.hw.histogram.Add(int64(d)); err != nil {
+		}
 	}
 	result.Data.Fiftieth = s.hw.durations[max(s.hw.histogram.Count*int64(50)/100-1, 0)]
 	result.Data.Ninetieth = s.hw.durations[max(s.hw.histogram.Count*int64(90)/100-1, 0)]
