@@ -184,21 +184,6 @@ func makeCaller(in *pb.BigData) func() {
 	}
 }
 
-func buildClients(url *common.URL, ctx context.Context) []*triple.TripleClient {
-	ccs := make([]*triple.TripleClient, *numConn)
-	key := url.GetParam(constant.BEAN_NAME_KEY, "")
-	consumerService := config.GetConsumerService(key)
-
-	for i := range ccs {
-		client, err := triple.NewTripleClient(url, consumerService)
-		if err != nil {
-			logger.Error("client init failed: %s", i)
-		}
-		ccs[i] = client
-	}
-	return ccs
-}
-
 func parseHist(hist *stats.Histogram) {
 	fmt.Println("qps:", float64(hist.Count)/float64(*duration))
 	fmt.Printf("Latency: (50/90/99 %%ile): %v/%v/%v\n",

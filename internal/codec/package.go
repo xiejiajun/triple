@@ -25,13 +25,10 @@ import (
 	"github.com/dubbogo/triple/pkg/common"
 )
 
-const (
-	// DUBBO3 is dubbo3 protocol name
-	DUBBO3 = "dubbo3"
-)
+
 
 func init() {
-	common.SetPackageHandler(DUBBO3, NewTriplePkgHandler)
+	common.SetPackageHandler(common.TRIPLE, NewTriplePkgHandler)
 }
 
 // TriplePackageHandler is the imple of PackageHandler, and it handles data package of triple

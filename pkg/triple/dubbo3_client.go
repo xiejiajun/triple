@@ -43,15 +43,23 @@ type TripleClient struct {
 
 // NewTripleClient create triple client with given @url,
 // it's return tripleClient , contains invoker, and contain triple conn
+// @url is the invocation url when dubbo client invoct. Now, triple only use Location and Protocol field of url.
+// @impl must have method: GetDubboStub(cc *dubbo3.TripleConn) interface{}, to be capable with grpc
 func NewTripleClient(url *dubboCommon.URL, impl interface{}) (*TripleClient, error) {
 	tripleClient := &TripleClient{
 		url: url,
 	}
+	// start triple client connection,
 	if err := tripleClient.connect(url); err != nil {
 		return nil, err
 	}
-	invoker := getInvoker(impl, newTripleConn(tripleClient)) // put dubbo3 network logic to tripleConn
+
+	// put dubbo3 network logic to tripleConn.
+	invoker := getInvoker(impl, newTripleConn(tripleClient))
+
+	// put dubbo3 network logic to tripleClient
 	tripleClient.Invoker = reflect.ValueOf(invoker)
+
 	return tripleClient, nil
 }
 
@@ -70,8 +78,10 @@ func (t *TripleClient) connect(url *dubboCommon.URL) error {
 }
 
 // Request call h2Controller to send unary rpc req to server
-func (t *TripleClient) Request(ctx context.Context, method string, arg, reply interface{}) error {
-	reqData, err := proto.Marshal(arg.(proto.Message))
+// @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigUnaryTest
+// @arg is request body
+func (t *TripleClient) Request(ctx context.Context, path string, arg proto.Message, reply interface{}) error {
+	reqData, err := proto.Marshal(arg)
 	if err != nil {
 		logger.Errorf("client request marshal error = %v", err)
 		return err
@@ -82,24 +92,25 @@ func (t *TripleClient) Request(ctx context.Context, method string, arg, reply in
 			return err
 		}
 	}
-	if err := t.h2Controller.UnaryInvoke(ctx, method, reqData, reply); err != nil {
+	if err := t.h2Controller.UnaryInvoke(ctx, path, reqData, reply); err != nil {
 		return err
 	}
 	return nil
 }
 
 // StreamRequest call h2Controller to send streaming request to sever, to start link.
-func (t *TripleClient) StreamRequest(ctx context.Context, method string) (grpc.ClientStream, error) {
+// @path is /interfaceKey/functionName e.g. /com.apache.dubbo.sample.basic.IGreeter/BigStreamTest
+func (t *TripleClient) StreamRequest(ctx context.Context, path string) (grpc.ClientStream, error) {
 	if t.h2Controller == nil {
 		if err := t.connect(t.url); err != nil {
 			logger.Errorf("dubbo client connect to url error = %v", err)
 			return nil, err
 		}
 	}
-	return t.h2Controller.StreamInvoke(ctx, method)
+	return t.h2Controller.StreamInvoke(ctx, path)
 }
 
-// Close
+// Close destroy http controller and return
 func (t *TripleClient) Close() {
 	logger.Debug("Triple Client Is closing")
 	t.h2Controller.Destroy()

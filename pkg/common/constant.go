@@ -18,5 +18,6 @@
 package common
 
 const (
+	TRIPLE = "tri"
 	DefaultHttp2ControllerReadBufferSize = 1000000
 )

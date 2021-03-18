@@ -36,7 +36,7 @@ import (
 
 func init() {
 	// if user choose dubbo3 as url.Protocol, triple Handler will use it to handle header
-	common.SetProtocolHeaderHandler(DUBBO3, NewTripleHeaderHandler)
+	common.SetProtocolHeaderHandler(common.TRIPLE, NewTripleHeaderHandler)
 }
 
 // TrailerKeys are to make triple compatible with grpc
