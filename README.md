@@ -36,7 +36,7 @@ It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has gr
 
     tri-unit-info: cluster information
 
-  - 返回头（trailer 返回头字段）
+  - Response header（trailer fields）
 
     grpc-status: grpc status code
 
