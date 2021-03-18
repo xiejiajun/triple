@@ -45,5 +45,5 @@ It is an amazing (grpc+) protocol, compatible with Dubbo 3.0 and grpc-go. has gr
     trace-proto-bin: trace binary data
 
 ### Docs
-link to [triple docs](./docs/README.md)
+[Triple-go docs](./docs/README_zh.md)
 

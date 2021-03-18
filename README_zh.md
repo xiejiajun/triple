@@ -45,5 +45,5 @@ Triple-go 是一个基于http2协议的go语言协议库，在 [Dubbo-go](https:
 
 ### 文档
 
-link to [triple docs](./docs/README_zh.md)
+[Triple-go 文档](./docs/README_zh.md)
 
