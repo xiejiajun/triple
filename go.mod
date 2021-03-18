@@ -15,7 +15,3 @@ require (
 	google.golang.org/grpc v1.33.1
 	gotest.tools v2.2.0+incompatible
 )
-
-replace (
-	github.com/apache/dubbo-go => ../dubbo-go
-)
