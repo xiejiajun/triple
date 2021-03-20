@@ -40,6 +40,7 @@ func (t *TriplePackageHandler) Frame2PkgData(frameData []byte) ([]byte, uint32) 
 	if len(frameData) < 5 {
 		return []byte{}, 0
 	}
+	// TODO HTTP2协议数据包的包头只有5字节，dubbo2协议的为16字节，他们的第一个字节都是标志位0
 	lineHeader := frameData[:5]
 	length := binary.BigEndian.Uint32(lineHeader[1:])
 	if len(frameData) < 5+int(length) {
@@ -47,6 +48,7 @@ func (t *TriplePackageHandler) Frame2PkgData(frameData []byte) ([]byte, uint32) 
 		// we only need length of all data
 		return frameData[5:], length
 	}
+	// TODO 返回这个TCP包的完整数据，5+length为这个TCP包的截止位置
 	return frameData[5 : 5+length], length
 }
 

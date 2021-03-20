@@ -103,6 +103,7 @@ func (t *TripleServer) run() {
 
 // handleRawConn create a H2 Controller to deal with new conn
 func (t *TripleServer) handleRawConn(conn net.Conn) error {
+	// TODO 使用Http2 Server处理请求
 	srv := &http2.Server{}
 	h2Controller, err := NewH2Controller(true, t.rpcServiceMap, t.url, t.opt)
 	if err != nil {

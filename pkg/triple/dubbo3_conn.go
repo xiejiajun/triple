@@ -42,6 +42,7 @@ func (t *TripleConn) Invoke(ctx context.Context, method string, args, reply inte
 	if !ok {
 		return errors.Errorf("reply is not impl of proto.Message")
 	}
+	// TODO 客户端发起请求
 	if err := t.client.Request(ctx, method, protoMsg, replyMsg); err != nil {
 		return err
 	}

@@ -82,6 +82,7 @@ func skipHeader(frameData []byte) ([]byte, uint32) {
 		return []byte{}, 0
 	}
 	lineHeader := frameData[:5]
+	// TODO 从HTTP2.0数据包的协议头中获取当前包的数据长度
 	length := binary.BigEndian.Uint32(lineHeader[1:])
 	return frameData[5:], length
 }
@@ -104,6 +105,7 @@ func (hc *H2Controller) readSplitData(rBody io.ReadCloser) chan message.Message 
 				var n int
 				var err error
 				if splitBuffer.Len() < int(fromFrameHeaderDataSize) || splitBuffer.Len() == 0 {
+					// TODO 读取TCP数据包
 					n, err = rBody.Read(buf)
 				}
 
@@ -114,31 +116,42 @@ func (hc *H2Controller) readSplitData(rBody io.ReadCloser) chan message.Message 
 					return
 				}
 				splitedData := buf[:n]
+				// TODO 将splitedData写入splitBuffer
 				splitBuffer.Write(splitedData)
+				// TODO fromFrameHeaderDataSize为0表示第一次读取当前数据包, 这时候需要做两件事：
+				// 	1. 从协议头里面获取当前数据包body的真实长度
+				//  2. 将数据包中的协议头从splitBuffer剔除掉
 				if fromFrameHeaderDataSize == 0 {
 					// should parse data frame header first
 					data := splitBuffer.Bytes()
 					var totalSize uint32
+					// TODO fromFrameHeaderDataSize为0表示第一次读取当前数据包，需要解析数据包协议头获取数据包body长度
 					if data, totalSize = skipHeader(data); totalSize == 0 {
+						// TODO 空包直接忽略
 						break
 					} else {
 						// get wanting data size from header
 						fromFrameHeaderDataSize = totalSize
 					}
+					// TODO 读取新数据包时先重置splitBuffer，这是为了把HTTP2.0数据包的协议头剔除掉,这部分不是我们需要的数据
 					splitBuffer.Reset()
 					splitBuffer.Write(data)
 				}
+				// TODO splitBuffer的长度大于等于数据包协议头解析出来的数据长度以后，表示当前数据包数据都已经到了
 				if splitBuffer.Len() >= int(fromFrameHeaderDataSize) {
 					allDataBody := make([]byte, fromFrameHeaderDataSize)
+					// TODO 将splitBuffer中的数据读入allDataBody
 					_, err := splitBuffer.Read(allDataBody)
 					if err != nil {
 						logger.Errorf("read SplitedDatas error = %v", err)
 					}
+					// TODO 将这个数据包的数据通过chan发送出去，实现异步交互
 					cbm <- message.Message{
 						Buffer:  bytes.NewBuffer(allDataBody),
 						MsgType: message.DataMsgType,
 					}
 					// temp data is sent, and reset wanting data size
+					// TODO 数据包处理完成，重置数据包大小跟踪变量
 					fromFrameHeaderDataSize = 0
 				}
 			}
@@ -182,6 +195,9 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 		sendChan := st.GetSend()
 		closeChan := make(chan struct{})
 
+		// TODO 解析HTTP2.0协议数据包，读取我们需要的数据, 由于不是常规的http请求(GET/POST...)，不能通过request.ParseForm()等方法解析TCP
+		//  数据包，所以需要我们自己解析, 标准Http请求数据包解析成具体对象的逻辑可以参考gin(github.com/gin-gonic/gin) 的binding/binding.go里面的
+		//  Binding.Bind(*http.Request, interface{}) error的具体实现类
 		// start receiving from http2 server, and forward to upper proxy invoker
 		ch := hc.readSplitData(r.Body)
 		go func() {
@@ -243,6 +259,7 @@ func getMethodAndStreamDescMap(ds common.Dubbo3GrpcService) (map[string]grpc.Met
 	sdMap := make(map[string]grpc.MethodDesc, 8)
 	strMap := make(map[string]grpc.StreamDesc, 8)
 	for _, v := range ds.ServiceDesc().Methods {
+		// TODO 这里和gRpc的相互兼容，因为ds.ServiceDesc()和gRpc一样都是通过protocol插件生成(protoc-gen-dubbo3)
 		sdMap[v.MethodName] = v
 	}
 	for _, v := range ds.ServiceDesc().Streams {
@@ -423,6 +440,7 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 	return stream.NewClientUserStream(clientStream, serilizer, pkgHandler), nil
 }
 
+// TODO dubbo3请求发送
 // UnaryInvoke can start unary invocation, called by dubbo3 client, with @path and request @data
 func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, data []byte, reply interface{}) error {
 	sendStreamChan := make(chan h2Triple.BufferMsg, 2)
@@ -444,6 +462,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, data []byt
 		Handler:  headerHandler,
 	}
 
+	// TODO 通过Http客户端发送请求，因为用的是HTTP2.0协议，所以可以偷懒
 	rsp, err := hc.client.Post("https://"+hc.address+path, "application/grpc+proto", &stremaReq)
 	if err != nil {
 		logger.Errorf("triple unary invoke error = %v", err)
@@ -466,6 +485,7 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, data []byt
 
 	splitedDataChain := make(chan message.Message)
 
+	// TODO 处理返回值
 	go func() {
 		for {
 			select {

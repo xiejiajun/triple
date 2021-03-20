@@ -98,6 +98,7 @@ func (t *TripleClient) Request(ctx context.Context, path string, arg, reply prot
 			return err
 		}
 	}
+	// TODO 客户端发请求
 	if err := t.h2Controller.UnaryInvoke(ctx, path, reqData, reply); err != nil {
 		return err
 	}

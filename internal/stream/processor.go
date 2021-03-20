@@ -195,6 +195,7 @@ func newStreamingProcessor(s *serverStream, pkgHandler common.PackageHandler, de
 func (sp *streamingProcessor) runRPC() {
 	serverUserstream := newServerUserStream(sp.stream, sp.serializer, sp.pkgHandler)
 	go func() {
+		// TODO gRpc的Stream Handler
 		if err := sp.streamDesc.Handler(sp.stream.getService(), serverUserstream); err != nil {
 			sp.handleRPCErr(err)
 			return
