@@ -290,6 +290,10 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, url *dubboCommon.UR
 	var client http.Client
 	if !isServer {
 		client = http.Client{
+			// TODO 这里使用的是github.com/dubbogo/net/transport.go的Transport,
+			//  所以最终使用的ClientConn也是dubbogo里面的,所以最终golang httpClient会调用到
+			//   ClientConn.RoundTrip 然后调用到ClientConn.encodeHeaders和clientStream.writeRequestBody
+			//   然后就会调用到triple.StreamingRequest.SendChan获取请求body数据发送给Server了
 			Transport: &h2.Transport{
 				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
 					return net.Dial(network, addr)
@@ -399,6 +403,10 @@ func (hc *H2Controller) StreamInvoke(ctx context.Context, path string) (grpc.Cli
 		Handler:  headerHandler,
 	}
 	go func() {
+		// TODO &stremaReq.SendChan里面的请求body最终在dubbogo/net项目下面的Transport(构建http client时传入的)里面
+		//   会被取出来真正发送到服务端, 这就是为什么可以发送源源不断的stream类型请求的原理(那边clientStream.writeRequestBody的实现逻辑
+		//   是只要不遇到ServerStreamCloseMsgType类型的消息就将从通道获取到的body源源不断的发给服务端) 每次发送的数据包body大小http客户端会
+		//   在封装HTTP数据包的时候会自动写入到协议头里面去，无需我们处理，我们只需要关注应用层协议的header就行
 		rsp, err := hc.client.Post("https://"+hc.address+path, "application/grpc+proto", &stremaReq)
 		if err != nil {
 			logger.Errorf("http2 request error = %s", err)
@@ -447,22 +455,26 @@ func (hc *H2Controller) UnaryInvoke(ctx context.Context, path string, data []byt
 
 	headerHandler, _ := common.GetProtocolHeaderHandler(hc.url.Protocol, hc.url, ctx)
 
+	// TODO 先写入请求数据
 	sendStreamChan <- h2Triple.BufferMsg{
 		Buffer:  bytes.NewBuffer(hc.pkgHandler.Pkg2FrameData(data)),
 		MsgType: h2Triple.MsgType(message.DataMsgType),
 	}
 
+	// TODO 在写入请求数据结束事件
 	sendStreamChan <- h2Triple.BufferMsg{
 		Buffer:  bytes.NewBuffer([]byte{}),
 		MsgType: h2Triple.MsgType(message.ServerStreamCloseMsgType),
 	}
 
+	// TODO github.com/dubbogo/net/transport.go里面的clientStream.writeRequestBody方法会从SendChan里面读取请求数据
 	stremaReq := h2Triple.StreamingRequest{
 		SendChan: sendStreamChan,
 		Handler:  headerHandler,
 	}
 
-	// TODO 通过Http客户端发送请求，因为用的是HTTP2.0协议，所以可以偷懒
+	// TODO 通过Http客户端发送请求，因为用的是HTTP2.0协议，所以可以偷懒， &stremaReq.SendChan里面的请求body最终在dubbogo/net项目
+	//   下面的Transport(构建http client时传入的)里面会被取出来真正发送到服务端
 	rsp, err := hc.client.Post("https://"+hc.address+path, "application/grpc+proto", &stremaReq)
 	if err != nil {
 		logger.Errorf("triple unary invoke error = %v", err)

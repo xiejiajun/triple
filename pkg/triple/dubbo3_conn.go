@@ -62,6 +62,7 @@ func newTripleConn(client *TripleClient) *TripleConn {
 	}
 }
 
+// TODO 这里兼容gRpc方法
 // getInvoker return invoker that have service method
 func getInvoker(impl interface{}, conn *TripleConn) interface{} {
 	in := make([]reflect.Value, 0, 16)
