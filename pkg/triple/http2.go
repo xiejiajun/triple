@@ -293,9 +293,16 @@ func NewH2Controller(isServer bool, rpcServiceMap *sync.Map, url *dubboCommon.UR
 	if !isServer {
 		client = http.Client{
 			// TODO 这里使用的是github.com/dubbogo/net/transport.go的Transport,
-			//  所以最终使用的ClientConn也是dubbogo里面的,所以最终golang httpClient会调用到
+			//   所以最终使用的ClientConn也是dubbogo里面的,所以最终golang httpClient会调用到
 			//   ClientConn.RoundTrip 然后调用到ClientConn.encodeHeaders和clientStream.writeRequestBody
 			//   然后就会调用到triple.StreamingRequest.SendChan获取请求body数据发送给Server了
+			//
+			// TODO 需要注意的是：最终发送数据到服务端的入口在github.com/dubbogo/net/transport.go里面的
+			//   bodyWriterState.scheduleBodyWrite，因为h2.Transport.t1为nil, 所以Transport.expectContinueTimeout返回值为0
+			//   也就是Transport.getBodyWriterState里面的s.delay为0，所以为bodyWriterState赋值的s.Timer = xxx语句并没有得到执行，
+			//   也就是bodyWriterState.scheduleBodyWrite里面的s.timer == nil条件是满足的，所里这里就启动协程调用s.fn(这个闭包函数里面最终
+			//   调用clientStream.writeRequestBody从StreamingRequest的数据通道sendChan中取出数据拷贝到http.Request.Body里面), 最终
+			//   httpClient上层的数据发送逻辑就会发送这些Request， 这就开始发送数据了
 			Transport: &h2.Transport{
 				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
 					return net.Dial(network, addr)
