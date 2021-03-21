@@ -197,7 +197,9 @@ func (hc *H2Controller) GetHandler() func(w http.ResponseWriter, r *http.Request
 
 		// TODO 解析HTTP2.0协议数据包，读取我们需要的数据, 由于不是常规的http请求(GET/POST...)，不能通过request.ParseForm()等方法解析TCP
 		//  数据包，所以需要我们自己解析, 标准Http请求数据包解析成具体对象的逻辑可以参考gin(github.com/gin-gonic/gin) 的binding/binding.go里面的
-		//  Binding.Bind(*http.Request, interface{}) error的具体实现类
+		//  Binding.Bind(*http.Request, interface{}) error的具体实现类 ---- 最主要的是Triple协议自己又在Http数据包Body里面加了一层自己的协议头信息
+		//  这是HTTP2.0协议规范？可能是的，因为Http2.0不像Http1.x每个请求都重复传输Http Header, 所以不能依赖Header里面的Content-Length头信息，
+		//  需要在Body里面加上表明body数据大小的头
 		// start receiving from http2 server, and forward to upper proxy invoker
 		ch := hc.readSplitData(r.Body)
 		go func() {
